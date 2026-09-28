@@ -96,30 +96,34 @@
 <body>
     
     <div id="filterWindow">
-    <h4 style="margin: 0 0 12px 0; font-size: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Filter by Permit Date</h4>
-    <div class="filter-row">
-        <label>Start:</label>
-        <input type="date" id="startDate" onchange="filterByDateRange()">
-    </div>
-    <div class="filter-row">
-        <label>End:</label>
-        <input type="date" id="endDate" onchange="filterByDateRange()">
-    </div>
-    
-    <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
-        <label style="font-size: 12px; color: #ccc;">Animation Mode:</label>
-       <select id="animMode" onchange="document.getElementById('pulseSettings').style.display = (this.value === 'pulse') ? 'block' : 'none';" style="width: 100%; background: #333; color: white; border: 1px solid #777; padding: 4px; margin-top: 3px; margin-bottom: 8px;">
-            <option value="cumulative">Cumulative (Snowball)</option>
-            <option value="pulse">Rolling Pulse</option>
-        </select>
-        
-        <div id="pulseSettings" style="display: none; margin-bottom: 8px;">
-            <label style="font-size: 12px; color: #ccc;">Window Size (Days):</label>
-            <input type="number" id="pulseDays" value="90" min="7" max="730" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 4px; margin-top: 3px; box-sizing: border-box;">
+        <h4 style="margin: 0 0 12px 0; font-size: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Filter by Permit Date</h4>
+        <div class="filter-row">
+            <label>Start:</label>
+            <input type="date" id="startDate" onchange="filterByDateRange()">
         </div>
-</div>
+        <div class="filter-row">
+            <label>End:</label>
+            <input type="date" id="endDate" onchange="filterByDateRange()">
+        </div>
+        
+        <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
+            <label style="font-size: 12px; color: #ccc;">Animation Mode:</label>
+            <select id="animMode" onchange="document.getElementById('pulseSettings').style.display = (this.value === 'pulse') ? 'block' : 'none';" style="width: 100%; background: #333; color: white; border: 1px solid #777; padding: 4px; margin-top: 3px; margin-bottom: 8px;">
+                <option value="cumulative">Cumulative (Snowball)</option>
+                <option value="pulse">Rolling Pulse</option>
+            </select>
+            
+            <div id="pulseSettings" style="display: none; margin-bottom: 8px;">
+                <label style="font-size: 12px; color: #ccc;">Window Size (Days):</label>
+                <input type="number" id="pulseDays" value="90" min="7" max="730" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 4px; margin-top: 3px; box-sizing: border-box;">
+            </div>
 
-    <div id="map"></div>
+            <button id="playBtn" onclick="togglePlayback()" style="width: 100%; background: #33a02c; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-bottom: 5px;">▶ Play Animation</button>
+            <button onclick="resetDates()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold;">Reset Filter</button>
+        </div>
+    </div> <!-- THIS CLOSING DIV IS CRITICAL. DO NOT DELETE IT. -->
+
+    <div id="map"></div> <!-- The map must be a sibling, not a child -->
 
     <div id="imageModal" onclick="closeModal(event)">
         <span id="prevArrow" class="gallery-arrow" onclick="changePhoto(-1, event)">&#10094;</span>
