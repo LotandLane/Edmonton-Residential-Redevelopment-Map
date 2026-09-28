@@ -69,10 +69,11 @@
         #galleryCounter {
             position: absolute; bottom: 20px; color: white; font-family: sans-serif; font-size: 16px;
         }
-	/* --- MOBILE OPTIMIZATIONS --- */
-    @media (max-width: 600px) {
+	/* --- MOBILE & LANDSCAPE OPTIMIZATIONS --- */
+    @media (max-width: 600px), (max-height: 500px) {
         #filterWindow {
-            top: 10px; right: 10px; width: 160px; padding: 10px;
+            top: 10px; right: 10px; width: 140px; padding: 10px;
+            max-height: 40vh; /* Prevents overlap by capping height */
         }
         .filter-row {
             flex-direction: column; align-items: flex-start; margin-bottom: 6px;
@@ -81,19 +82,14 @@
             width: 100%; margin-top: 3px;
         }
         .legend {
-            font-size: 11px; padding: 8px; max-height: 120px; overflow-y: auto;
+            font-size: 11px; padding: 8px; 
+            max-height: 30vh; /* Locks to 30% of screen height */
+            overflow-y: auto; /* Forces a scrollbar */
+            -webkit-overflow-scrolling: touch; /* Smooth iOS scrolling */
         }
-        .gallery-arrow {
-            font-size: 35px; padding: 10px;
-        }
-        /* Stops large photos from pushing the popup off-screen */
-        .leaflet-popup-content img {
-            max-height: 150px; object-fit: cover;
-        }
-        /* Ensures the popup text stays readable on small screens */
-        .leaflet-popup-content {
-            min-width: 180px !important;
-        }
+        .gallery-arrow { font-size: 35px; padding: 10px; }
+        .leaflet-popup-content img { max-height: 15vh; object-fit: cover; }
+        .leaflet-popup-content { min-width: 180px !important; }
     }
     </style>
 </head>
@@ -143,6 +139,8 @@
         var legend = L.control({position: 'bottomright'});
         legend.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'info legend');
+		L.DomEvent.disableScrollPropagation(div);
+      	  	L.DomEvent.disableClickPropagation(div);
             var types = [
                 'Single detached', 'Semi-detached', 'Duplex', 'Triplex', 
                 'Rowhome', 'Stacked Rowhome', 'Cluster housing', 
@@ -211,7 +209,12 @@
             if (!units || isNaN(units)) return 0;
             let val = parseInt(units);
             let domainMin = 1; let domainMax = 700;
-            let rangeMin = 1; let rangeMax = 10;
+            
+            // Boost the minimum radius specifically for touch screens
+            let isMobile = window.innerWidth <= 600;
+            let rangeMin = isMobile ? 3.5 : 1; 
+            let rangeMax = isMobile ? 12 : 10; 
+            
             let exponent = 0.57;
             if (val < domainMin) val = domainMin;
             if (val > domainMax) val = domainMax;
