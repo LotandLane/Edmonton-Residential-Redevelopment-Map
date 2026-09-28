@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lot & Lane: Edmonton Infill Analytics</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { width: 100vw; height: 100vh; background: #222222; }
+
+        /* Date Range UI */
+        #filterWindow {
+            position: absolute; top: 20px; right: 20px; z-index: 1000;
+            background: rgba(34, 34, 34, 0.95); padding: 15px;
+            border: 1px solid #555; border-radius: 4px;
+            color: white; font-family: sans-serif;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 220px;
+        }
+        .filter-row {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 10px;
+        }
+        .filter-row label { font-size: 13px; color: #ccc; }
+        .filter-row input[type="date"] {
+            background: #333; color: white; border: 1px solid #777;
+            border-radius: 3px; padding: 4px; font-size: 13px; width: 125px;
+        }
+        ::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+
+        /* Legend Styles */
+        .legend {
+            background: rgba(34, 34, 34, 0.95); padding: 12px 15px;
+            color: white; font-family: sans-serif; font-size: 13px;
+            border: 1px solid #555; border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); line-height: 20px;
+        }
+        .legend i {
+            width: 12px; height: 12px; float: left;
+            margin-right: 8px; margin-top: 4px; border-radius: 50%;
+            border: 1px solid #000;
+        }
+        .legend h4 {
+            margin: 0 0 8px 0; font-size: 14px;
+            border-bottom: 1px solid #555; padding-bottom: 4px;
+        }
+        .legend-note {
+            margin-top: 8px; font-size: 11px; color: #aaa;
+            border-top: 1px solid #555; padding-top: 6px; line-height: 1.2;
+        }
+
+        /* Lightbox Overlay */
+        #imageModal {
+            display: none; position: fixed; z-index: 9999; left: 0; top: 0; 
+            width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.9); 
+            justify-content: center; align-items: center;
+        }
+        #modalImage {
+            max-width: 85vw; max-height: 85vh; border: 3px solid white; 
+            border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .gallery-arrow {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            color: white; font-size: 50px; font-weight: bold; cursor: pointer; padding: 20px; user-select: none;
+        }
+        .gallery-arrow:hover { color: #1f78b4; }
+        #prevArrow { left: 20px; }
+        #nextArrow { right: 20px; }
+        #galleryCounter {
+            position: absolute; bottom: 20px; color: white; font-family: sans-serif; font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    
+    <div id="filterWindow">
+        <h4 style="margin: 0 0 12px 0; font-size: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Filter by Permit Date</h4>
+        <div class="filter-row">
+            <label>Start:</label>
+            <input type="date" id="startDate" onchange="filterByDateRange()">
+        </div>
+        <div class="filter-row">
+            <label>End:</label>
+            <input type="date" id="endDate" onchange="filterByDateRange()">
+        </div>
+        <button onclick="resetDates()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-top: 5px;">Reset Filter</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="imageModal" onclick="closeModal(event)">
+        <span id="prevArrow" class="gallery-arrow" onclick="changePhoto(-1, event)">&#10094;</span>
+        <img id="modalImage" src="" alt="Enlarged Site Photo">
+        <span id="nextArrow" class="gallery-arrow" onclick="changePhoto(1, event)">&#10095;</span>
+        <div id="galleryCounter"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([53.5461, -113.4938], 12);
+
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ | Data: <a href="https://data.edmonton.ca" target="_blank">City of Edmonton Open Data</a>',
+            maxZoom: 16
+        }).addTo(map);
+
+        // --- GLOBAL VARIABLES ---
+        let globalGalleries = {}; 
+        let masterInfillData = null;  
+        let currentInfillLayer = null; 
+        let globalMinDate = Infinity;
+        let globalMaxDate = -Infinity;
+        let currentActiveProject = null;
+        let currentPhotoIndex = 0;
+
+        // --- LEGEND CONTROL ---
+        var legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'info legend');
+            var types = [
+                'Single detached', 'Semi-detached', 'Duplex', 'Triplex', 
+                'Rowhome', 'Stacked Rowhome', 'Cluster housing', 
+                'Lodging House', 'Lowrise', 'Midrise', 'Highrise'
+            ];
+
+            div.innerHTML = '<h4>Housing Typology</h4>';
+            for (var i = 0; i < types.length; i++) {
+                div.innerHTML += '<i style="background:' + getTypologyColor(types[i]) + '"></i> ' + types[i] + '<br>';
+            }
+            div.innerHTML += '<div class="legend-note">Dot size indicates total units.</div>';
+            return div;
+        };
+        legend.addTo(map);
+
+        // --- GALLERY LOGIC ---
+        function openGallery(projectID) {
+            currentActiveProject = String(projectID); 
+            currentPhotoIndex = 0;
+            updateModalView();
+            document.getElementById('imageModal').style.display = 'flex';
+        }
+
+        function updateModalView() {
+            let gallery = globalGalleries[currentActiveProject];
+            document.getElementById('modalImage').src = gallery[currentPhotoIndex].Photo_Path;
+            let showArrows = gallery.length > 1 ? 'block' : 'none';
+            document.getElementById('prevArrow').style.display = showArrows;
+            document.getElementById('nextArrow').style.display = showArrows;
+            document.getElementById('galleryCounter').innerText = `${currentPhotoIndex + 1} / ${gallery.length} — ${gallery[currentPhotoIndex].Image_Type || 'Site Photo'}`;
+        }
+
+        function changePhoto(direction, event) {
+            event.stopPropagation(); 
+            let gallery = globalGalleries[currentActiveProject];
+            currentPhotoIndex += direction;
+            if (currentPhotoIndex < 0) currentPhotoIndex = gallery.length - 1;
+            if (currentPhotoIndex >= gallery.length) currentPhotoIndex = 0;
+            updateModalView();
+        }
+
+        function closeModal(event) {
+            if (event.target.id === 'imageModal') document.getElementById('imageModal').style.display = 'none';
+        }
+
+        // --- STYLING LOGIC ---
+        function getTypologyColor(type) {
+            if (!type) return '#999999';
+            switch (type.trim()) {
+                case 'Single detached': return '#1f78b4';
+                case 'Semi-detached': return '#a6cee3';
+                case 'Duplex': return '#33a02c';
+                case 'Triplex': return '#b2df8a';
+                case 'Stacked Rowhome': return '#e31a1c';
+                case 'Lodging House': return '#fb9a99';
+                case 'Rowhome': return '#ff7f00';
+                case 'Cluster housing': return '#fdbf6f';
+                case 'Lowrise': return '#6a3d9a';
+                case 'Midrise': return '#cab2d6';
+                case 'Highrise': return '#b15928';
+                default: return '#999999';
+            }
+        }
+
+        function getPolynomialSize(units) {
+            if (!units || isNaN(units)) return 0;
+            let val = parseInt(units);
+            let domainMin = 1; let domainMax = 700;
+            let rangeMin = 1; let rangeMax = 10;
+            let exponent = 0.57;
+            if (val < domainMin) val = domainMin;
+            if (val > domainMax) val = domainMax;
+            let normalized = (val - domainMin) / (domainMax - domainMin);
+            return (rangeMin + Math.pow(normalized, exponent) * (rangeMax - rangeMin)) * 2; 
+        }
+
+        // --- DATE PARSING LOGIC ---
+        function parseCustomDate(dateStr) {
+            if (!dateStr) return null;
+            let parts = String(dateStr).split('-');
+            if (parts.length === 3) {
+                let day = parseInt(parts[0], 10);
+                let monthStr = parts[1].substring(0,3);
+                let year = parseInt(parts[2], 10);
+                if (year < 100) year += 2000; 
+                let months = { "Jan":0, "Feb":1, "Mar":2, "Apr":3, "May":4, "Jun":5, "Jul":6, "Aug":7, "Sep":8, "Oct":9, "Nov":10, "Dec":11 };
+                let month = months[monthStr] !== undefined ? months[monthStr] : 0;
+                return new Date(year, month, day).getTime();
+            }
+            let d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d.getTime();
+        }
+
+        function formatToYMD(timestamp) {
+            let d = new Date(timestamp);
+            let y = d.getFullYear();
+            let m = String(d.getMonth() + 1).padStart(2, '0');
+            let day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        // --- FILTERING LOGIC ---
+        function filterByDateRange() {
+            let startDateRaw = document.getElementById('startDate').value;
+            let endDateRaw = document.getElementById('endDate').value;
+            
+            let startLimit = startDateRaw ? new Date(startDateRaw.replace(/-/g, '/')).getTime() : -Infinity;
+            let endLimit = endDateRaw ? new Date(endDateRaw.replace(/-/g, '/')).getTime() : Infinity;
+
+            if (currentInfillLayer) {
+                map.removeLayer(currentInfillLayer);
+            }
+
+            currentInfillLayer = L.geoJson(masterInfillData, {
+                filter: function (feature) {
+                    let rawDate = feature.properties["Permit Date"] || feature.properties.Permit_Date || feature.properties.permit_date || feature.properties.Date || "";
+                    let featureTime = parseCustomDate(rawDate);
+                    
+                    if (!featureTime) return true; 
+                    return (featureTime >= startLimit && featureTime <= endLimit);
+                },
+                pointToLayer: function (feature, latlng) {
+                    let featureType = feature.properties.type || feature.properties.Type || feature.properties.TYPE;
+                    let featureUnits = feature.properties.Units || feature.properties.units || feature.properties.UNITS;
+                    return L.circleMarker(latlng, {
+                        radius: getPolynomialSize(featureUnits), 
+                        fillColor: getTypologyColor(featureType),
+                        color: '#000000', weight: 0.5, fillOpacity: 0.85
+                    });
+                },
+                onEachFeature: function (feature, layer) {
+                    let featureType = feature.properties.type || feature.properties.Type || feature.properties.TYPE || 'Unknown Typology';
+                    let featureUnits = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 'N/A';
+                    let permitDate = feature.properties["Permit Date"] || feature.properties.Permit_Date || feature.properties.permit_date || feature.properties.Date || 'N/A';
+                    
+                    let rawMasterId = feature.properties.ID || feature.properties.id || feature.properties.Id;
+                    let projectID = rawMasterId ? String(rawMasterId) : null; 
+                    let forumLink = feature.properties["SRC Link"] || feature.properties["src link"] || null;
+
+                    let popupContent = `
+                        <div style="min-width: 220px; font-family: sans-serif;">
+                            <h3 style="margin: 0 0 5px 0; color: #333; font-size: 16px;">${featureType}</h3>
+                            <p style="margin: 0 0 10px 0; color: #555; font-size: 14px;">
+                                <strong>Units:</strong> ${featureUnits}<br>
+                                <strong>Permit Date:</strong> ${permitDate}
+                            </p>
+                    `;
+
+                    let gallery = projectID ? globalGalleries[projectID] : null;
+
+                    if (gallery && gallery.length > 0) {
+                        let coverPhoto = gallery[0].Photo_Path; 
+                        
+                        if (gallery.length === 1) {
+                            popupContent += `<img src="${coverPhoto}" onclick="openGallery('${projectID}')" style="width: 100%; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 12px; cursor: pointer;" alt="Site Photo" title="Click to enlarge">`;
+                        } else {
+                            popupContent += `
+                                <div style="position: relative; text-align: center; cursor: pointer; margin-bottom: 12px;" onclick="openGallery('${projectID}')" title="Click to view all ${gallery.length} photos">
+                                    <img src="${coverPhoto}" style="width: 100%; border-radius: 4px; border: 1px solid #ccc; opacity: 0.6; background-color: black;">
+                                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; width: max-content;">
+                                        View Gallery (${gallery.length})
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    if (forumLink) {
+                        popupContent += `<a href="${forumLink}" target="_blank" style="display: block; text-align: center; padding: 6px 10px; background: #1f78b4; color: white; text-decoration: none; border-radius: 3px; font-size: 13px; font-weight: bold;">View on SkyriseEdmonton &rarr;</a>`;
+                    }
+
+                    popupContent += `</div>`;
+                    layer.bindPopup(popupContent);
+                }
+            });
+            
+            currentInfillLayer.addTo(map);
+        }
+
+        function resetDates() {
+            document.getElementById('startDate').value = formatToYMD(globalMinDate);
+            document.getElementById('endDate').value = formatToYMD(globalMaxDate);
+            filterByDateRange();
+        }
+
+        // --- FETCH DATA ---
+        let fetchInfill = fetch('infill.geojson').then(r => r.json());
+        let fetchPhotos = fetch('photos.geojson').then(r => {
+            if (!r.ok) throw new Error("File not found");
+            return r.json();
+        }).catch(error => ({ features: [] }));
+
+        Promise.all([fetchInfill, fetchPhotos])
+        .then(([infillData, photosData]) => {
+            
+            if (photosData && photosData.features) {
+                photosData.features.forEach(feature => {
+                    let props = feature.properties;
+                    if (props.Field1 === "ID") return;
+                    let rawId = props.Field1 || props.ID || props.id || props.Id; 
+                    if (rawId) {
+                        let safeId = String(rawId); 
+                        if (!globalGalleries[safeId]) globalGalleries[safeId] = [];
+                        let rawPath = props.Field2 || props.Photo_Path || "";
+                        let fixedPath = rawPath.replace(/\\\\/g, '/').replace(/\\/g, '/');
+                        globalGalleries[safeId].push({
+                            Photo_Path: fixedPath,
+                            Image_Type: props.Field3 || props.Image_Type || 'Site Photo'
+                        });
+                    }
+                });
+            }
+
+            masterInfillData = infillData;
+            
+            masterInfillData.features.forEach(feature => {
+                let rawDate = feature.properties["Permit Date"] || feature.properties.Permit_Date || feature.properties.permit_date || feature.properties.Date || "";
+                let featureTime = parseCustomDate(rawDate);
+                
+                if (featureTime) {
+                    if (featureTime < globalMinDate) globalMinDate = featureTime;
+                    if (featureTime > globalMaxDate) globalMaxDate = featureTime;
+                }
+            });
+
+            if (globalMinDate !== Infinity && globalMaxDate !== -Infinity) {
+                document.getElementById('startDate').value = formatToYMD(globalMinDate);
+                document.getElementById('endDate').value = formatToYMD(globalMaxDate);
+            }
+            
+            filterByDateRange();
+        })
+        .catch(error => {
+            console.error('Fatal error loading data:', error);
+            alert("Map Error: Could not load the main infill data.");
+        });
+    </script>
+</body>
+</html>
