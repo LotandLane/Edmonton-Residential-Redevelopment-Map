@@ -69,6 +69,32 @@
         #galleryCounter {
             position: absolute; bottom: 20px; color: white; font-family: sans-serif; font-size: 16px;
         }
+	/* --- MOBILE OPTIMIZATIONS --- */
+    @media (max-width: 600px) {
+        #filterWindow {
+            top: 10px; right: 10px; width: 160px; padding: 10px;
+        }
+        .filter-row {
+            flex-direction: column; align-items: flex-start; margin-bottom: 6px;
+        }
+        .filter-row input[type="date"] {
+            width: 100%; margin-top: 3px;
+        }
+        .legend {
+            font-size: 11px; padding: 8px; max-height: 120px; overflow-y: auto;
+        }
+        .gallery-arrow {
+            font-size: 35px; padding: 10px;
+        }
+        /* Stops large photos from pushing the popup off-screen */
+        .leaflet-popup-content img {
+            max-height: 150px; object-fit: cover;
+        }
+        /* Ensures the popup text stays readable on small screens */
+        .leaflet-popup-content {
+            min-width: 180px !important;
+        }
+    }
     </style>
 </head>
 <body>
