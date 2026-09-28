@@ -96,17 +96,26 @@
 <body>
     
     <div id="filterWindow">
-        <h4 style="margin: 0 0 12px 0; font-size: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Filter by Permit Date</h4>
-        <div class="filter-row">
-            <label>Start:</label>
-            <input type="date" id="startDate" onchange="filterByDateRange()">
-        </div>
-        <div class="filter-row">
-            <label>End:</label>
-            <input type="date" id="endDate" onchange="filterByDateRange()">
-        </div>
-        <button onclick="resetDates()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-top: 5px;">Reset Filter</button>
+    <h4 style="margin: 0 0 12px 0; font-size: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Filter by Permit Date</h4>
+    <div class="filter-row">
+        <label>Start:</label>
+        <input type="date" id="startDate" onchange="filterByDateRange()">
     </div>
+    <div class="filter-row">
+        <label>End:</label>
+        <input type="date" id="endDate" onchange="filterByDateRange()">
+    </div>
+    
+    <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
+        <label style="font-size: 12px; color: #ccc;">Animation Mode:</label>
+        <select id="animMode" style="width: 100%; background: #333; color: white; border: 1px solid #777; padding: 4px; margin-top: 3px; margin-bottom: 8px;">
+            <option value="cumulative">Cumulative (Snowball)</option>
+            <option value="pulse">90-Day Rolling Pulse</option>
+        </select>
+        <button id="playBtn" onclick="togglePlayback()" style="width: 100%; background: #33a02c; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-bottom: 5px;">▶ Play Animation</button>
+        <button onclick="resetDates()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold;">Reset Filter</button>
+    </div>
+</div>
 
     <div id="map"></div>
 
@@ -381,6 +390,57 @@
             console.error('Fatal error loading data:', error);
             alert("Map Error: Could not load the main infill data.");
         });
+// --- TIMELAPSE ANIMATION ENGINE ---
+    let playInterval;
+    let isPlaying = false;
+
+    function togglePlayback() {
+        if (isPlaying) {
+            // Stop the animation
+            clearInterval(playInterval);
+            document.getElementById('playBtn').innerText = "▶ Play Animation";
+            document.getElementById('playBtn').style.background = "#33a02c"; // Green
+            isPlaying = false;
+        } else {
+            // Start the animation
+            document.getElementById('playBtn').innerText = "⏸ Pause Animation";
+            document.getElementById('playBtn').style.background = "#e31a1c"; // Red
+            isPlaying = true;
+            
+            // Grab the starting timestamp (or default to the earliest permit)
+            let startInputRaw = document.getElementById('startDate').value;
+            let currentSimDate = startInputRaw ? new Date(startInputRaw.replace(/-/g, '/')).getTime() : globalMinDate;
+            
+            // If the user was already at the end, restart from the beginning
+            if (currentSimDate >= globalMaxDate) {
+                currentSimDate = globalMinDate;
+            }
+            
+            playInterval = setInterval(() => {
+                // Jump forward 1 week per frame
+                currentSimDate += (7 * 86400000); 
+                
+                if (currentSimDate >= globalMaxDate) {
+                    currentSimDate = globalMaxDate;
+                    togglePlayback(); // Auto-pause when we hit the present day
+                }
+                
+                let mode = document.getElementById('animMode').value;
+                
+                if (mode === 'cumulative') {
+                    document.getElementById('startDate').value = formatToYMD(globalMinDate);
+                    document.getElementById('endDate').value = formatToYMD(currentSimDate);
+                } else { 
+                    // Pulse Mode: Trail exactly 90 days behind the simulated current date
+                    let pulseStart = currentSimDate - (90 * 86400000);
+                    document.getElementById('startDate').value = formatToYMD(Math.max(globalMinDate, pulseStart));
+                    document.getElementById('endDate').value = formatToYMD(currentSimDate);
+                }
+                
+                filterByDateRange(); // Force Leaflet to redraw the map
+            }, 200); // 200ms = 5 frames per second
+        }
+    }
     </script>
 </body>
 </html>
