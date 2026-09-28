@@ -119,7 +119,11 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        var map = L.map('map').setView([53.5461, -113.4938], 12);
+        // Create a custom renderer with a large invisible hit tolerance for mobile
+    var myRenderer = L.canvas({ padding: 0.5, tolerance: 15 });
+    
+    // Apply the renderer to the map
+    var map = L.map('map', { renderer: myRenderer }).setView([53.5461, -113.4938], 12);
 
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ | Data: <a href="https://data.edmonton.ca" target="_blank">City of Edmonton Open Data</a>',
@@ -206,21 +210,16 @@
         }
 
         function getPolynomialSize(units) {
-            if (!units || isNaN(units)) return 0;
-            let val = parseInt(units);
-            let domainMin = 1; let domainMax = 700;
-            
-            // Boost the minimum radius specifically for touch screens
-            let isMobile = window.innerWidth <= 600;
-            let rangeMin = isMobile ? 3.5 : 1; 
-            let rangeMax = isMobile ? 12 : 10; 
-            
-            let exponent = 0.57;
-            if (val < domainMin) val = domainMin;
-            if (val > domainMax) val = domainMax;
-            let normalized = (val - domainMin) / (domainMax - domainMin);
-            return (rangeMin + Math.pow(normalized, exponent) * (rangeMax - rangeMin)) * 2; 
-        }
+        if (!units || isNaN(units)) return 0;
+        let val = parseInt(units);
+        let domainMin = 1; let domainMax = 700;
+        let rangeMin = 1; let rangeMax = 10;
+        let exponent = 0.57;
+        if (val < domainMin) val = domainMin;
+        if (val > domainMax) val = domainMax;
+        let normalized = (val - domainMin) / (domainMax - domainMin);
+        return (rangeMin + Math.pow(normalized, exponent) * (rangeMax - rangeMin)) * 2; 
+    }
 
         // --- DATE PARSING LOGIC ---
         function parseCustomDate(dateStr) {
