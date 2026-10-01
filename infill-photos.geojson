@@ -1,6 +1,6 @@
 {
 "type": "FeatureCollection",
-"name": "infill-photos",
+"name": "infill-photosv2",
 "features": [
 {"type":"Feature","properties":{"Field1":"ID","Field2":"Photo_Path","Field3":"Image_Type"},"geometry":null},
 {"type":"Feature","properties":{"Field1":"Inf-001913","Field2":"images\\Inf-001913-001.jpg","Field3":"Construction progress"},"geometry":null},
