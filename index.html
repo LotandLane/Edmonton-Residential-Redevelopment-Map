@@ -130,8 +130,10 @@
     <script>
         var isMobile = window.innerWidth <= 600;
         var myRenderer = L.canvas({ padding: 0.5, tolerance: isMobile ? 10 : 3 });
-        var map = L.map('map', { renderer: myRenderer }).setView([53.5461, -113.4938], 12);
-
+        var map = L.map('map', { 
+            renderer: myRenderer,
+            minZoom: 10 // <-- Prevents zooming out past the metro area
+        }).setView([53.5461, -113.4938], 12);
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles &copy; Esri | Data: <a href="https://data.edmonton.ca" target="_blank">City of Edmonton Open Data</a>',
             maxZoom: 16
@@ -539,18 +541,19 @@ async function performSearch() {
     let query = document.getElementById('addressSearch').value;
     if (!query) return;
 
-    // 1. Ask OpenStreetMap for coordinates (forced to Edmonton for accuracy)
+    // 1. Ask Esri for coordinates (Massively more accurate for Edmonton's grid)
     try {
-        let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ", Edmonton, AB")}`);
+        let response = await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query + ", Edmonton, AB")}&maxLocations=1`);
         let data = await response.json();
 
-        if (data.length === 0) {
-            alert("Address not found in Edmonton. Try adding 'Street' or 'Avenue'.");
+        if (!data.candidates || data.candidates.length === 0) {
+            alert("Address not found. Try adding 'St' or 'Ave' (e.g., 10420 124 St).");
             return;
         }
 
-        let searchLat = parseFloat(data[0].lat);
-        let searchLng = parseFloat(data[0].lon);
+        // Esri returns location as x (lng) and y (lat)
+        let searchLat = data.candidates[0].location.y;
+        let searchLng = data.candidates[0].location.x;
 
         // 2. Find the closest visible permit on your map
         let shortestDistance = Infinity;
@@ -569,13 +572,13 @@ async function performSearch() {
             }
         });
 
-        // 3. Zoom if within 150 meters, otherwise error
-        if (shortestDistance <= 150 && closestLayer) {
+        // 3. Zoom if within 250 meters, otherwise error
+        if (shortestDistance <= 250 && closestLayer) {
             let coords = closestLayer.feature.geometry.coordinates;
-            map.flyTo([coords[1], coords[0]], 18);
+            map.flyTo([coords[1], coords[0]], 16); // <-- Changed from 18 to 16
             closestLayer.openPopup();
         } else {
-            alert("No matching site found. (Note: Ensure your date/unit filters aren't hiding it!)");
+            alert("No matching site found nearby. (Note: Ensure your date/unit filters aren't hiding it!)");
         }
     } catch (error) {
         console.error("Search error:", error);
