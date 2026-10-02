@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Edmonton Residential Infill Map</title>
+    <title>Edmonton Residential Redevelopment Map</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -79,6 +79,11 @@
     <!-- CONTROLS -->
     <div id="filterWindow">
         <h4 style="margin: 0 0 12px 0; font-size: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Map Filters</h4>
+
+    <div style="display: flex; gap: 5px; margin-bottom: 12px; border-bottom: 1px solid #555; padding-bottom: 12px;">
+        <input type="text" id="addressSearch" placeholder="Search Address..." onkeypress="if(event.key === 'Enter') performSearch()" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 6px; font-size: 13px;">
+        <button onclick="performSearch()" style="background: #1f78b4; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-weight: bold;">🔍</button>
+    </div>
         
         <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Permit Date:</label>
         <div class="filter-row"><input type="date" id="startDate" onchange="applyFilters()" style="width: 100%;"></div>
@@ -123,11 +128,9 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Use a tight 3px tolerance on desktop, but keep a 10px tolerance for mobile thumbs
-    var isMobile = window.innerWidth <= 600;
-    var myRenderer = L.canvas({ padding: 0.5, tolerance: isMobile ? 10 : 3 });
-    
-    var map = L.map('map', { renderer: myRenderer }).setView([53.5461, -113.4938], 12);
+        var isMobile = window.innerWidth <= 600;
+        var myRenderer = L.canvas({ padding: 0.5, tolerance: isMobile ? 10 : 3 });
+        var map = L.map('map', { renderer: myRenderer }).setView([53.5461, -113.4938], 12);
 
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles &copy; Esri | Data: <a href="https://data.edmonton.ca" target="_blank">City of Edmonton Open Data</a>',
@@ -148,13 +151,11 @@
             let prpl = props["Prpl to remain?"] || props.prpl_to_remain || "";
             let conv = props["Conversion"] || props.conversion || "";
             
-            // Normalize everything to uppercase strings
             let prplStr = String(prpl).toUpperCase().trim();
             let convStr = String(conv).toUpperCase().trim();
             
-            // Catch "TRUE", "T", or raw true values
             if (prplStr === "TRUE" || prplStr === "T" || convStr === "TRUE" || convStr === "T") {
-                return "Conversion/Renovating of Existing Structure";
+                return "Conversion/Renovation";
             }
             return props.type || props.Type || props.TYPE || 'Unknown Typology';
         }
@@ -173,7 +174,7 @@
                 case 'Lowrise': return '#6a3d9a';
                 case 'Midrise': return '#cab2d6';
                 case 'Highrise': return '#b15928';
-                case 'Conversion/Renovating of Existing Structure': return '#ffe119'; // Bright contrasting yellow
+                case 'Conversion/Renovation': return '#ffe119';
                 default: return '#999999';
             }
         }
@@ -189,7 +190,7 @@
                 'Single detached', 'Semi-detached', 'Duplex', 'Triplex', 
                 'Rowhome', 'Stacked Rowhome', 'Cluster housing', 
                 'Lodging House', 'Lowrise', 'Midrise', 'Highrise',
-                'Conversion/Renovating of Existing Structure'
+                'Conversion/Renovation'
             ];
 
             let html = '<h4 style="margin: 0 0 8px 0; font-size: 14px; border-bottom: 1px solid #555; padding-bottom: 4px;">Filter Typology</h4>';
@@ -204,8 +205,6 @@
                 `;
             }
             html += '</div>';
-            
-            // Legend Notes
             html += '<div style="margin-top: 10px; font-size: 11px; color: #aaa; border-top: 1px solid #555; padding-top: 6px; line-height: 1.4;">';
             html += 'Dot size indicates total units.<br>';
             html += '<span style="color:#fff; font-weight:bold;">&compfn; White outline</span> indicates photo available.</div>';
@@ -225,11 +224,20 @@
 
         function updateModalView() {
             let gallery = globalGalleries[currentActiveProject];
-            document.getElementById('modalImage').src = gallery[currentPhotoIndex].Photo_Path;
+            let currentImage = gallery[currentPhotoIndex]; 
+        
+            document.getElementById('modalImage').src = currentImage.Photo_Path;
+        
             let showArrows = gallery.length > 1 ? 'block' : 'none';
             document.getElementById('prevArrow').style.display = showArrows;
             document.getElementById('nextArrow').style.display = showArrows;
-            document.getElementById('galleryCounter').innerText = `${currentPhotoIndex + 1} / ${gallery.length} — ${gallery[currentPhotoIndex].Image_Type || 'Site Photo'}`;
+        
+            // Build the dynamic text
+            let imgType = currentImage.Image_Type || 'Site Photo';
+            let creditText = currentImage.Credit ? `<br><span style="font-size: 13px; color: #ccc;">📸 Photo by: ${currentImage.Credit}</span>` : "";
+        
+            // Inject it into the counter div
+            document.getElementById('galleryCounter').innerHTML = `${currentPhotoIndex + 1} / ${gallery.length} — ${imgType} ${creditText}`;
         }
 
         function changePhoto(direction, event) {
@@ -282,139 +290,137 @@
         }
 
         // --- MASTER FILTER ENGINE ---
-    function applyFilters() {
-        // 1. Get Date Limits
-        let startDateRaw = document.getElementById('startDate').value;
-        let endDateRaw = document.getElementById('endDate').value;
-        let startLimit = startDateRaw ? new Date(startDateRaw.replace(/-/g, '/')).getTime() : -Infinity;
-        let endLimit = endDateRaw ? new Date(endDateRaw.replace(/-/g, '/')).getTime() : Infinity;
+        function applyFilters() {
+            let startDateRaw = document.getElementById('startDate').value;
+            let endDateRaw = document.getElementById('endDate').value;
+            let startLimit = startDateRaw ? new Date(startDateRaw.replace(/-/g, '/')).getTime() : -Infinity;
+            let endLimit = endDateRaw ? new Date(endDateRaw.replace(/-/g, '/')).getTime() : Infinity;
 
-        // 2. Get Unit Limits
-        let minU = parseInt(document.getElementById('minUnits').value);
-        let maxU = parseInt(document.getElementById('maxUnits').value);
-        let minUnitsLimit = isNaN(minU) ? -Infinity : minU;
-        let maxUnitsLimit = isNaN(maxU) ? Infinity : maxU;
+            let minU = parseInt(document.getElementById('minUnits').value);
+            let maxU = parseInt(document.getElementById('maxUnits').value);
+            let minUnitsLimit = isNaN(minU) ? -Infinity : minU;
+            let maxUnitsLimit = isNaN(maxU) ? Infinity : maxU;
 
-        // 3. Get Active Typologies from Legend
-        let checkboxes = document.querySelectorAll('.type-filter');
-        let activeTypes = new Set();
-        checkboxes.forEach(cb => {
-            if (cb.checked) activeTypes.add(cb.value);
-        });
+            let checkboxes = document.querySelectorAll('.type-filter');
+            let activeTypes = new Set();
+            checkboxes.forEach(cb => {
+                if (cb.checked) activeTypes.add(cb.value);
+            });
 
-        if (currentInfillLayer) {
-            map.removeLayer(currentInfillLayer);
+            if (currentInfillLayer) {
+                map.removeLayer(currentInfillLayer);
+            }
+
+            let seenCoords = {}; 
+
+            currentInfillLayer = L.geoJson(masterInfillData, {
+                filter: function (feature) {
+                    let rawDate = feature.properties["Permit Date"] || feature.properties.Permit_Date || feature.properties.permit_date || feature.properties.Date || "";
+                    let featureTime = parseCustomDate(rawDate);
+                    if (featureTime && (featureTime < startLimit || featureTime > endLimit)) return false;
+
+                    let featureUnitsRaw = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 1;
+                    let parsedUnits = parseInt(featureUnitsRaw);
+                    let unitsNum = isNaN(parsedUnits) ? 1 : parsedUnits;
+                    if (unitsNum < minUnitsLimit || unitsNum > maxUnitsLimit) return false;
+
+                    let effectiveType = getEffectiveTypology(feature);
+                    if (!activeTypes.has(effectiveType)) return false;
+
+                    return true; 
+                },
+                pointToLayer: function (feature, latlng) {
+                    let coordKey = latlng.lat.toFixed(5) + "_" + latlng.lng.toFixed(5);
+                    let count = seenCoords[coordKey] || 0;
+                    seenCoords[coordKey] = count + 1;
+                    
+                    let finalLatLng = latlng;
+                    if (count > 0) {
+                        let angle = count * (Math.PI / 2); 
+                        let distance = 0.00006 + (Math.floor(count/4) * 0.00004); 
+                        finalLatLng = L.latLng(
+                            latlng.lat + Math.sin(angle) * distance,
+                            latlng.lng + Math.cos(angle) * distance
+                        );
+                    }
+
+                    let effectiveType = getEffectiveTypology(feature);
+                    let featureUnits = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 1;
+                    
+                    let rawMasterId = feature.properties.ID || feature.properties.id || feature.properties.Id;
+                    let projectID = rawMasterId ? String(rawMasterId) : null; 
+                    let hasPhoto = projectID && globalGalleries[projectID] && globalGalleries[projectID].length > 0;
+
+                    return L.circleMarker(finalLatLng, { 
+                        radius: getPolynomialSize(featureUnits), 
+                        fillColor: getTypologyColor(effectiveType),
+                        color: hasPhoto ? '#ffffff' : '#000000', 
+                        weight: hasPhoto ? 1.2 : 0.5, 
+                        fillOpacity: 0.85
+                    });
+                },
+                onEachFeature: function (feature, layer) {
+                    let effectiveType = getEffectiveTypology(feature);
+                    let featureUnits = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 'N/A';
+                    let permitDate = feature.properties["Permit Date"] || feature.properties.Permit_Date || feature.properties.permit_date || feature.properties.Date || 'N/A';
+                    
+                    let rawMasterId = feature.properties.ID || feature.properties.id || feature.properties.Id;
+                    let projectID = rawMasterId ? String(rawMasterId) : null; 
+                    let forumLink = feature.properties["SRC Link"] || feature.properties["src link"] || null;
+                    let address = feature.properties.Address || feature.properties.ADDRESS || 'Edmonton, AB';
+
+                    let popupContent = `
+                        <div style="min-width: 220px; font-family: sans-serif;">
+                            <h3 style="margin: 0 0 2px 0; color: #333; font-size: 15px;">${address}</h3>
+                            <span style="font-size: 12px; color: #777; display: block; margin-bottom: 8px;">${effectiveType}</span>
+                            <p style="margin: 0 0 10px 0; color: #555; font-size: 13px;">
+                                <strong>Units:</strong> ${featureUnits}<br>
+                                <strong>Permit Date:</strong> ${permitDate}
+                            </p>
+                    `;
+
+                    let gallery = projectID ? globalGalleries[projectID] : null;
+
+                    if (gallery && gallery.length > 0) {
+                        let coverPhoto = gallery[0].Photo_Path; 
+                        
+                        if (gallery.length === 1) {
+                            popupContent += `<img src="${coverPhoto}" onclick="openGallery('${projectID}')" style="width: 100%; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 12px; cursor: pointer;" alt="Site Photo" title="Click to enlarge">`;
+                        } else {
+                            popupContent += `
+                                <div style="position: relative; text-align: center; cursor: pointer; margin-bottom: 12px;" onclick="openGallery('${projectID}')" title="Click to view all ${gallery.length} photos">
+                                    <img src="${coverPhoto}" style="width: 100%; border-radius: 4px; border: 1px solid #ccc; opacity: 0.6; background-color: black;">
+                                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; width: max-content;">
+                                        View Gallery (${gallery.length})
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    if (forumLink) {
+                        popupContent += `<a href="${forumLink}" target="_blank" style="display: block; text-align: center; margin-bottom: 8px; padding: 6px 10px; background: #1f78b4; color: white; text-decoration: none; border-radius: 3px; font-size: 13px; font-weight: bold;">View on SkyriseEdmonton &rarr;</a>`;
+                    }
+
+                    if (projectID) {
+                        let formBaseUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfLzwD_xHoGRngDcc29dDMn-4pnALuFXWUAMpCTYfAKoYLsWg/viewform?usp=pp_url&entry.1713844478=";
+                        let finalFormUrl = formBaseUrl + projectID;
+                        popupContent += `<a href="${finalFormUrl}" target="_blank" style="display: block; text-align: center; padding: 6px 10px; background: #33a02c; color: white; text-decoration: none; border-radius: 3px; font-size: 13px; font-weight: bold;">📸 Submit a Photo</a>`;
+                    }
+
+                    popupContent += `</div>`;
+                    layer.bindPopup(popupContent);
+                }
+            }).addTo(map);
         }
 
-        // Tracks coordinates to nudge overlapping dots
-        let seenCoords = {}; 
-
-        currentInfillLayer = L.geoJson(masterInfillData, {
-            filter: function (feature) {
-                let rawDate = feature.properties["Permit Date"] || feature.properties.Permit_Date || feature.properties.permit_date || feature.properties.Date || "";
-                let featureTime = parseCustomDate(rawDate);
-                if (featureTime && (featureTime < startLimit || featureTime > endLimit)) return false;
-
-                let featureUnitsRaw = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 1;
-                let parsedUnits = parseInt(featureUnitsRaw);
-                let unitsNum = isNaN(parsedUnits) ? 1 : parsedUnits;
-                if (unitsNum < minUnitsLimit || unitsNum > maxUnitsLimit) return false;
-
-                let effectiveType = getEffectiveTypology(feature);
-                if (!activeTypes.has(effectiveType)) return false;
-
-                return true; 
-            },
-            pointToLayer: function (feature, latlng) {
-                let coordKey = latlng.lat.toFixed(5) + "_" + latlng.lng.toFixed(5);
-                let count = seenCoords[coordKey] || 0;
-                seenCoords[coordKey] = count + 1;
-                
-                let finalLatLng = latlng;
-                if (count > 0) {
-                    // Nudge overlapping dots outward into a tiny spiral
-                    let angle = count * (Math.PI / 2); 
-                    let distance = 0.00006 + (Math.floor(count/4) * 0.00004); 
-                    finalLatLng = L.latLng(
-                        latlng.lat + Math.sin(angle) * distance,
-                        latlng.lng + Math.cos(angle) * distance
-                    );
-                }
-
-                let effectiveType = getEffectiveTypology(feature);
-                let featureUnits = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 1;
-                
-                let rawMasterId = feature.properties.ID || feature.properties.id || feature.properties.Id;
-                let projectID = rawMasterId ? String(rawMasterId) : null; 
-                let hasPhoto = projectID && globalGalleries[projectID] && globalGalleries[projectID].length > 0;
-
-                return L.circleMarker(finalLatLng, { 
-                    radius: getPolynomialSize(featureUnits), 
-                    fillColor: getTypologyColor(effectiveType),
-                    color: hasPhoto ? '#ffffff' : '#000000', 
-                    weight: hasPhoto ? 2.5 : 0.5, 
-                    fillOpacity: 0.85
-                });
-            },
-            onEachFeature: function (feature, layer) {
-                let effectiveType = getEffectiveTypology(feature);
-                let featureUnits = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 'N/A';
-                let permitDate = feature.properties["Permit Date"] || feature.properties.Permit_Date || feature.properties.permit_date || feature.properties.Date || 'N/A';
-                
-                let rawMasterId = feature.properties.ID || feature.properties.id || feature.properties.Id;
-                let projectID = rawMasterId ? String(rawMasterId) : null; 
-                let forumLink = feature.properties["SRC Link"] || feature.properties["src link"] || null;
-
-                let popupContent = `
-                    <div style="min-width: 220px; font-family: sans-serif;">
-                        <h3 style="margin: 0 0 5px 0; color: #333; font-size: 16px;">${effectiveType}</h3>
-                        <p style="margin: 0 0 10px 0; color: #555; font-size: 14px;">
-                            <strong>Units:</strong> ${featureUnits}<br>
-                            <strong>Permit Date:</strong> ${permitDate}
-                        </p>
-                `;
-
-                let gallery = projectID ? globalGalleries[projectID] : null;
-
-                if (gallery && gallery.length > 0) {
-                    let coverPhoto = gallery[0].Photo_Path; 
-                    
-                    if (gallery.length === 1) {
-                        popupContent += `<img src="${coverPhoto}" onclick="openGallery('${projectID}')" style="width: 100%; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 12px; cursor: pointer;" alt="Site Photo" title="Click to enlarge">`;
-                    } else {
-                        popupContent += `
-                            <div style="position: relative; text-align: center; cursor: pointer; margin-bottom: 12px;" onclick="openGallery('${projectID}')" title="Click to view all ${gallery.length} photos">
-                                <img src="${coverPhoto}" style="width: 100%; border-radius: 4px; border: 1px solid #ccc; opacity: 0.6; background-color: black;">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; width: max-content;">
-                                    View Gallery (${gallery.length})
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
-
-                if (forumLink) {
-                    popupContent += `<a href="${forumLink}" target="_blank" style="display: block; text-align: center; padding: 6px 10px; background: #1f78b4; color: white; text-decoration: none; border-radius: 3px; font-size: 13px; font-weight: bold;">View on SkyriseEdmonton &rarr;</a>`;
-                }
-
-                popupContent += `</div>`;
-                layer.bindPopup(popupContent);
-            }
-        });
-        
-        currentInfillLayer.addTo(map);
-    }
-
+        // --- MISSING RESET FILTERS FUNCTION ADDED ---
         function resetFilters() {
             document.getElementById('startDate').value = formatToYMD(globalMinDate);
             document.getElementById('endDate').value = formatToYMD(globalMaxDate);
             document.getElementById('minUnits').value = '';
             document.getElementById('maxUnits').value = '';
-            
-            // Check all legend boxes
-            let checkboxes = document.querySelectorAll('.type-filter');
-            checkboxes.forEach(cb => cb.checked = true);
-            
+            document.querySelectorAll('.type-filter').forEach(cb => cb.checked = true);
             applyFilters();
         }
 
@@ -439,13 +445,13 @@
                         let rawPath = props.Field2 || props.Photo_Path || "";
                         let fixedPath = rawPath.replace(/\\\\/g, '/').replace(/\\/g, '/');
                         
-                        // Deduplication Logic: Prevents adding the same photo twice if Image_Type changed
                         let isDuplicate = globalGalleries[safeId].some(img => img.Photo_Path === fixedPath);
                         
                         if (!isDuplicate && fixedPath !== "") {
                             globalGalleries[safeId].push({
                                 Photo_Path: fixedPath,
-                                Image_Type: props.Field3 || props.Image_Type || 'Site Photo'
+                                Image_Type: props.Field3 || props.Image_Type || 'Site Photo',
+                                Credit: props.Credit || props.credit || null 
                             });
                         }
                     }
@@ -472,7 +478,7 @@
         })
         .catch(error => {
             console.error('Fatal error loading data:', error);
-            alert("Map Error: Could not load the main infill data. Check your filenames and local server!");
+            alert("Map Error: Could not load data. If you just double-clicked the HTML file, your browser is blocking the data for security. Use a local server or push to GitHub to test!");
         });
 
         // --- TIMELAPSE ANIMATION ENGINE ---
@@ -519,6 +525,64 @@
                 }, 200); 
             }
         }
+// --- DISTANCE MATH (Haversine Formula) ---
+function getDistance(lat1, lon1, lat2, lon2) {
+    var R = 6371e3; // Earth radius in meters
+    var φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+    var Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
+    var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+// --- SEARCH LOGIC ---
+async function performSearch() {
+    let query = document.getElementById('addressSearch').value;
+    if (!query) return;
+
+    // 1. Ask OpenStreetMap for coordinates (forced to Edmonton for accuracy)
+    try {
+        let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ", Edmonton, AB")}`);
+        let data = await response.json();
+
+        if (data.length === 0) {
+            alert("Address not found in Edmonton. Try adding 'Street' or 'Avenue'.");
+            return;
+        }
+
+        let searchLat = parseFloat(data[0].lat);
+        let searchLng = parseFloat(data[0].lon);
+
+        // 2. Find the closest visible permit on your map
+        let shortestDistance = Infinity;
+        let closestLayer = null;
+
+        currentInfillLayer.eachLayer(function(layer) {
+            if (layer.feature && layer.feature.geometry) {
+                let fLng = layer.feature.geometry.coordinates[0];
+                let fLat = layer.feature.geometry.coordinates[1];
+                let dist = getDistance(searchLat, searchLng, fLat, fLng);
+                
+                if (dist < shortestDistance) {
+                    shortestDistance = dist;
+                    closestLayer = layer;
+                }
+            }
+        });
+
+        // 3. Zoom if within 150 meters, otherwise error
+        if (shortestDistance <= 150 && closestLayer) {
+            let coords = closestLayer.feature.geometry.coordinates;
+            map.flyTo([coords[1], coords[0]], 18);
+            closestLayer.openPopup();
+        } else {
+            alert("No matching site found. (Note: Ensure your date/unit filters aren't hiding it!)");
+        }
+    } catch (error) {
+        console.error("Search error:", error);
+        alert("Search service is temporarily unavailable.");
+    }
+}
+
     </script>
 </body>
 </html>
