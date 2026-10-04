@@ -9,14 +9,34 @@
         body { margin: 0; padding: 0; }
         #map { width: 100vw; height: 100vh; background: #222222; }
 
-        /* Date Range & Filter UI */
-        #filterWindow {
-            position: absolute; top: 20px; right: 20px; z-index: 1000;
-            background: rgba(34, 34, 34, 0.95); padding: 15px;
-            border: 1px solid #555; border-radius: 4px;
-            color: white; font-family: sans-serif;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 220px;
+        /* Shared Drawer Styles */
+        .drawer-container {
+            position: absolute; right: 15px; z-index: 1000;
+            width: 250px; color: white; font-family: sans-serif;
+            display: flex; flex-direction: column;
         }
+        
+        #filterWindow { top: 15px; }
+        
+        /* Positioned above the Leaflet attribution */
+        #typologyWindow { bottom: 30px; } 
+
+        .drawer-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(45, 45, 45, 0.95); padding: 12px 15px;
+            border: 1px solid #555; border-radius: 4px;
+            cursor: pointer; user-select: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            font-size: 14px; font-weight: bold;
+        }
+        .drawer-header:hover { background: rgba(60, 60, 60, 0.95); }
+        
+        .drawer-content {
+            background: rgba(34, 34, 34, 0.95); padding: 15px;
+            border: 1px solid #555; border-radius: 0 0 4px 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-top: -4px;
+        }
+
+        /* Filter Inputs */
         .filter-row {
             display: flex; justify-content: space-between;
             align-items: center; margin-bottom: 10px;
@@ -28,12 +48,15 @@
         }
         ::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
 
-        /* Legend Styles */
-        .legend {
-            background: rgba(34, 34, 34, 0.95); padding: 12px 15px;
-            color: white; font-family: sans-serif; font-size: 13px;
-            border: 1px solid #555; border-radius: 4px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); line-height: 20px;
+        /* Typology Legend Styles */
+        .typology-label {
+            display: flex; align-items: center; cursor: pointer; 
+            font-size: 12px; margin-bottom: 6px;
+        }
+        .typology-label input { margin: 0 8px 0 0; cursor: pointer; }
+        .typology-label i {
+            width: 12px; height: 12px; border-radius: 50%; 
+            border: 1px solid #000; margin-right: 8px; display: inline-block;
         }
 
         /* Lightbox Overlay */
@@ -53,14 +76,16 @@
         .gallery-arrow:hover { color: #1f78b4; }
         #prevArrow { left: 20px; }
         #nextArrow { right: 20px; }
-        #galleryCounter { position: absolute; bottom: 20px; color: white; font-family: sans-serif; font-size: 16px; }
+        #galleryCounter { position: absolute; bottom: 20px; color: white; font-family: sans-serif; font-size: 16px; text-align: center; }
 
         /* --- MOBILE & LANDSCAPE OPTIMIZATIONS --- */
         @media (max-width: 600px), (max-height: 500px) {
-            #filterWindow { top: 10px; right: 10px; width: 150px; padding: 10px; max-height: 45vh; overflow-y: auto; }
+            .drawer-container { width: 220px; right: 10px; }
+            #filterWindow { top: 10px; }
+            #typologyWindow { bottom: 20px; }
+            .drawer-content { max-height: 40vh; overflow-y: auto; }
             .filter-row { flex-direction: column; align-items: flex-start; margin-bottom: 6px; }
             .filter-row input[type="date"], .filter-row input[type="number"] { width: 100%; margin-top: 3px; }
-            .legend { font-size: 11px; padding: 8px; max-height: 35vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
             .gallery-arrow { font-size: 35px; padding: 10px; }
             .leaflet-popup-content img { max-height: 15vh; object-fit: cover; }
             .leaflet-popup-content { min-width: 180px !important; }
@@ -70,47 +95,81 @@
 <body>
 
     <div id="disclaimerBanner" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; background: rgba(34,34,34,0.95); border: 1px solid #555; padding: 12px 20px; border-radius: 4px; color: #ccc; font-family: sans-serif; font-size: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 15px; max-width: 90vw; width: 600px;">
-    <div style="flex-grow: 1; line-height: 1.4;">
-        <strong>Disclaimer:</strong> This map tracks residential development permits within Edmonton's "redeveloping area" to visualize infill velocity. It relies on municipal open data, which may contain lags or anomalies. Not intended for formal real estate or legal decisions.
+        <div style="flex-grow: 1; line-height: 1.4;">
+            <strong>Disclaimer:</strong> This map tracks residential development permits within Edmonton's "redeveloping area" to visualize infill velocity. It relies on municipal open data, which may contain lags or anomalies. Not intended for formal real estate or legal decisions.
+        </div>
+        <span onclick="document.getElementById('disclaimerBanner').style.display='none'" style="color: white; font-size: 24px; font-weight: bold; cursor: pointer; padding: 0 5px;">&times;</span>
     </div>
-    <span onclick="document.getElementById('disclaimerBanner').style.display='none'" style="color: white; font-size: 24px; font-weight: bold; cursor: pointer; padding: 0 5px;">&times;</span>
-</div>
     
-    <!-- CONTROLS -->
-    <div id="filterWindow">
-        <h4 style="margin: 0 0 12px 0; font-size: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Map Filters</h4>
+    <!-- TOP RIGHT: MAP FILTERS -->
+    <div id="filterWindow" class="drawer-container">
+        <div class="drawer-header" onclick="toggleDrawer('mapDrawer')" style="border-radius: 4px;">
+            <span>Map Filters</span>
+            <span id="mapChevron">▲</span>
+        </div>
+        <div id="mapDrawerContent" class="drawer-content" style="display: block;">
+            <div style="display: flex; gap: 5px; margin-bottom: 12px; border-bottom: 1px solid #555; padding-bottom: 12px;">
+                <input type="text" id="addressSearch" placeholder="Search Address..." onkeypress="if(event.key === 'Enter') performSearch()" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 6px; font-size: 13px;">
+                <button onclick="performSearch()" style="background: #1f78b4; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-weight: bold;">🔍</button>
+            </div>
+            
+            <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Permit Date:</label>
+            <div class="filter-row"><input type="date" id="startDate" onchange="applyFilters()" style="width: 100%;"></div>
+            <div class="filter-row"><input type="date" id="endDate" onchange="applyFilters()" style="width: 100%;"></div>
+            
+            <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
+                <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Number of Units:</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="number" id="minUnits" placeholder="Min" onchange="applyFilters()" onkeyup="applyFilters()" style="width: 50%;">
+                    <input type="number" id="maxUnits" placeholder="Max" onchange="applyFilters()" onkeyup="applyFilters()" style="width: 50%;">
+                </div>
+            </div>
 
-    <div style="display: flex; gap: 5px; margin-bottom: 12px; border-bottom: 1px solid #555; padding-bottom: 12px;">
-        <input type="text" id="addressSearch" placeholder="Search Address..." onkeypress="if(event.key === 'Enter') performSearch()" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 6px; font-size: 13px;">
-        <button onclick="performSearch()" style="background: #1f78b4; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-weight: bold;">🔍</button>
-    </div>
-        
-        <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Permit Date:</label>
-        <div class="filter-row"><input type="date" id="startDate" onchange="applyFilters()" style="width: 100%;"></div>
-        <div class="filter-row"><input type="date" id="endDate" onchange="applyFilters()" style="width: 100%;"></div>
-        
-        <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
-            <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Number of Units:</label>
-            <div style="display: flex; gap: 5px;">
-                <input type="number" id="minUnits" placeholder="Min" onchange="applyFilters()" onkeyup="applyFilters()" style="width: 50%;">
-                <input type="number" id="maxUnits" placeholder="Max" onchange="applyFilters()" onkeyup="applyFilters()" style="width: 50%;">
+            <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
+                <label style="font-size: 12px; color: #ccc;">Animation Mode:</label>
+                <select id="animMode" onchange="document.getElementById('pulseSettings').style.display = (this.value === 'pulse') ? 'block' : 'none';" style="width: 100%; background: #333; color: white; border: 1px solid #777; padding: 4px; margin-top: 3px; margin-bottom: 8px;">
+                    <option value="cumulative">Cumulative (Snowball)</option>
+                    <option value="pulse">Rolling Pulse</option>
+                </select>
+                
+                <div id="pulseSettings" style="display: none; margin-bottom: 8px;">
+                    <label style="font-size: 12px; color: #ccc;">Window Size (Days):</label>
+                    <input type="number" id="pulseDays" value="90" min="7" max="730" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 4px; margin-top: 3px; box-sizing: border-box;">
+                </div>
+
+                <button id="playBtn" onclick="togglePlayback()" style="width: 100%; background: #33a02c; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-bottom: 5px;">▶ Play Animation</button>
+                <button onclick="resetFilters()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold;">Reset All Filters</button>
             </div>
         </div>
+    </div>
 
-        <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
-            <label style="font-size: 12px; color: #ccc;">Animation Mode:</label>
-            <select id="animMode" onchange="document.getElementById('pulseSettings').style.display = (this.value === 'pulse') ? 'block' : 'none';" style="width: 100%; background: #333; color: white; border: 1px solid #777; padding: 4px; margin-top: 3px; margin-bottom: 8px;">
-                <option value="cumulative">Cumulative (Snowball)</option>
-                <option value="pulse">Rolling Pulse</option>
-            </select>
-            
-            <div id="pulseSettings" style="display: none; margin-bottom: 8px;">
-                <label style="font-size: 12px; color: #ccc;">Window Size (Days):</label>
-                <input type="number" id="pulseDays" value="90" min="7" max="730" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 4px; margin-top: 3px; box-sizing: border-box;">
+    <!-- BOTTOM RIGHT: TYPOLOGY LEGEND -->
+    <div id="typologyWindow" class="drawer-container">
+        <!-- Defaulting this drawer to closed on load with '▼' -->
+        <div class="drawer-header" onclick="toggleDrawer('typologyDrawer')" style="border-radius: 4px;">
+            <span>Filter Typology</span>
+            <span id="typologyChevron">▼</span>
+        </div>
+        <!-- Style display starts as none so it is collapsed initially -->
+        <div id="typologyDrawerContent" class="drawer-content" style="display: none;">
+            <div id="typologyCheckboxContainer" style="display:flex; flex-direction:column;">
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Single detached" checked onchange="applyFilters()"><i style="background:#1f78b4;"></i>Single detached</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Semi-detached" checked onchange="applyFilters()"><i style="background:#a6cee3;"></i>Semi-detached</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Duplex" checked onchange="applyFilters()"><i style="background:#33a02c;"></i>Duplex</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Triplex" checked onchange="applyFilters()"><i style="background:#b2df8a;"></i>Triplex</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Rowhome" checked onchange="applyFilters()"><i style="background:#ff7f00;"></i>Rowhome</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Stacked Rowhome" checked onchange="applyFilters()"><i style="background:#e31a1c;"></i>Stacked Rowhome</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Cluster housing" checked onchange="applyFilters()"><i style="background:#fdbf6f;"></i>Cluster housing</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Lodging House" checked onchange="applyFilters()"><i style="background:#fb9a99;"></i>Lodging House</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Lowrise" checked onchange="applyFilters()"><i style="background:#6a3d9a;"></i>Lowrise</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Midrise" checked onchange="applyFilters()"><i style="background:#cab2d6;"></i>Midrise</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Highrise" checked onchange="applyFilters()"><i style="background:#b15928;"></i>Highrise</label>
+                <label class="typology-label"><input type="checkbox" class="type-filter" value="Conversion/Renovation" checked onchange="applyFilters()"><i style="background:#ffe119;"></i>Conversion/Renovation</label>
             </div>
-
-            <button id="playBtn" onclick="togglePlayback()" style="width: 100%; background: #33a02c; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-bottom: 5px;">▶ Play Animation</button>
-            <button onclick="resetFilters()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold;">Reset All Filters</button>
+            <div style="margin-top: 10px; font-size: 11px; color: #aaa; border-top: 1px solid #555; padding-top: 6px; line-height: 1.4;">
+                Dot size indicates total units.<br>
+                <span style="color:#fff; font-weight:bold;">&compfn; White outline</span> indicates photo available.
+            </div>
         </div>
     </div>
 
@@ -128,14 +187,43 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // --- ACCORDION LOGIC (Independent) ---
+        function toggleDrawer(drawerId) {
+            let drawerContent, chevron;
+
+            if (drawerId === 'mapDrawer') {
+                drawerContent = document.getElementById('mapDrawerContent');
+                chevron = document.getElementById('mapChevron');
+            } else {
+                drawerContent = document.getElementById('typologyDrawerContent');
+                chevron = document.getElementById('typologyChevron');
+            }
+
+            let isClosing = drawerContent.style.display === 'block';
+            
+            // Toggle display and change chevron direction
+            drawerContent.style.display = isClosing ? 'none' : 'block';
+            chevron.innerHTML = isClosing ? '▼' : '▲';
+            
+            // Adjust header border radius when opened to connect seamlessly to content box
+            let header = chevron.parentElement;
+            if (isClosing) {
+                header.style.borderRadius = "4px";
+            } else {
+                header.style.borderRadius = "4px 4px 0 0";
+            }
+        }
+
+        // --- MAP INIT ---
         var isMobile = window.innerWidth <= 600;
         var myRenderer = L.canvas({ padding: 0.5, tolerance: isMobile ? 10 : 3 });
         var map = L.map('map', { 
             renderer: myRenderer,
-            minZoom: 10 // <-- Prevents zooming out past the metro area
+            minZoom: 10
         }).setView([53.5461, -113.4938], 12);
+        
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri | Data: <a href="https://data.edmonton.ca" target="_blank">City of Edmonton Open Data</a>',
+            attribution: 'Tiles &copy; Esri | Data: <a href="https://data.edmonton.ca" target="_blank">City of Edmonton</a>',
             maxZoom: 16
         }).addTo(map);
 
@@ -152,13 +240,9 @@
             let props = feature.properties;
             let prpl = props["Prpl to remain?"] || props.prpl_to_remain || "";
             let conv = props["Conversion"] || props.conversion || "";
-            
             let prplStr = String(prpl).toUpperCase().trim();
             let convStr = String(conv).toUpperCase().trim();
-            
-            if (prplStr === "TRUE" || prplStr === "T" || convStr === "TRUE" || convStr === "T") {
-                return "Conversion/Renovation";
-            }
+            if (prplStr === "TRUE" || prplStr === "T" || convStr === "TRUE" || convStr === "T") return "Conversion/Renovation";
             return props.type || props.Type || props.TYPE || 'Unknown Typology';
         }
 
@@ -181,41 +265,6 @@
             }
         }
 
-        // --- LEGEND CONTROL (WITH CHECKBOXES) ---
-        var legend = L.control({position: 'bottomright'});
-        legend.onAdd = function (map) {
-            var div = L.DomUtil.create('div', 'info legend');
-            L.DomEvent.disableScrollPropagation(div);
-            L.DomEvent.disableClickPropagation(div);
-
-            var types = [
-                'Single detached', 'Semi-detached', 'Duplex', 'Triplex', 
-                'Rowhome', 'Stacked Rowhome', 'Cluster housing', 
-                'Lodging House', 'Lowrise', 'Midrise', 'Highrise',
-                'Conversion/Renovation'
-            ];
-
-            let html = '<h4 style="margin: 0 0 8px 0; font-size: 14px; border-bottom: 1px solid #555; padding-bottom: 4px;">Filter Typology</h4>';
-            html += '<div style="display:flex; flex-direction:column; gap:6px;">';
-            for (var i = 0; i < types.length; i++) {
-                html += `
-                    <label style="display:flex; align-items:center; cursor:pointer; font-size:12px;">
-                        <input type="checkbox" class="type-filter" value="${types[i]}" checked onchange="applyFilters()" style="margin:0 8px 0 0; cursor:pointer;">
-                        <i style="background:${getTypologyColor(types[i])}; width:12px; height:12px; border-radius:50%; border:1px solid #000; margin-right:6px; display:inline-block;"></i>
-                        ${types[i]}
-                    </label>
-                `;
-            }
-            html += '</div>';
-            html += '<div style="margin-top: 10px; font-size: 11px; color: #aaa; border-top: 1px solid #555; padding-top: 6px; line-height: 1.4;">';
-            html += 'Dot size indicates total units.<br>';
-            html += '<span style="color:#fff; font-weight:bold;">&compfn; White outline</span> indicates photo available.</div>';
-            
-            div.innerHTML = html;
-            return div;
-        };
-        legend.addTo(map);
-
         // --- GALLERY LOGIC ---
         function openGallery(projectID) {
             currentActiveProject = String(projectID); 
@@ -234,11 +283,9 @@
             document.getElementById('prevArrow').style.display = showArrows;
             document.getElementById('nextArrow').style.display = showArrows;
         
-            // Build the dynamic text
             let imgType = currentImage.Image_Type || 'Site Photo';
             let creditText = currentImage.Credit ? `<br><span style="font-size: 13px; color: #ccc;">📸 Photo by: ${currentImage.Credit}</span>` : "";
         
-            // Inject it into the counter div
             document.getElementById('galleryCounter').innerHTML = `${currentPhotoIndex + 1} / ${gallery.length} — ${imgType} ${creditText}`;
         }
 
@@ -305,13 +352,9 @@
 
             let checkboxes = document.querySelectorAll('.type-filter');
             let activeTypes = new Set();
-            checkboxes.forEach(cb => {
-                if (cb.checked) activeTypes.add(cb.value);
-            });
+            checkboxes.forEach(cb => { if (cb.checked) activeTypes.add(cb.value); });
 
-            if (currentInfillLayer) {
-                map.removeLayer(currentInfillLayer);
-            }
+            if (currentInfillLayer) map.removeLayer(currentInfillLayer);
 
             let seenCoords = {}; 
 
@@ -340,15 +383,11 @@
                     if (count > 0) {
                         let angle = count * (Math.PI / 2); 
                         let distance = 0.00006 + (Math.floor(count/4) * 0.00004); 
-                        finalLatLng = L.latLng(
-                            latlng.lat + Math.sin(angle) * distance,
-                            latlng.lng + Math.cos(angle) * distance
-                        );
+                        finalLatLng = L.latLng(latlng.lat + Math.sin(angle) * distance, latlng.lng + Math.cos(angle) * distance);
                     }
 
                     let effectiveType = getEffectiveTypology(feature);
                     let featureUnits = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 1;
-                    
                     let rawMasterId = feature.properties.ID || feature.properties.id || feature.properties.Id;
                     let projectID = rawMasterId ? String(rawMasterId) : null; 
                     let hasPhoto = projectID && globalGalleries[projectID] && globalGalleries[projectID].length > 0;
@@ -365,7 +404,6 @@
                     let effectiveType = getEffectiveTypology(feature);
                     let featureUnits = feature.properties.Units || feature.properties.units || feature.properties.UNITS || 'N/A';
                     let permitDate = feature.properties["Permit Date"] || feature.properties.Permit_Date || feature.properties.permit_date || feature.properties.Date || 'N/A';
-                    
                     let rawMasterId = feature.properties.ID || feature.properties.id || feature.properties.Id;
                     let projectID = rawMasterId ? String(rawMasterId) : null; 
                     let forumLink = feature.properties["SRC Link"] || feature.properties["src link"] || null;
@@ -385,7 +423,6 @@
 
                     if (gallery && gallery.length > 0) {
                         let coverPhoto = gallery[0].Photo_Path; 
-                        
                         if (gallery.length === 1) {
                             popupContent += `<img src="${coverPhoto}" onclick="openGallery('${projectID}')" style="width: 100%; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 12px; cursor: pointer;" alt="Site Photo" title="Click to enlarge">`;
                         } else {
@@ -416,7 +453,6 @@
             }).addTo(map);
         }
 
-        // --- MISSING RESET FILTERS FUNCTION ADDED ---
         function resetFilters() {
             document.getElementById('startDate').value = formatToYMD(globalMinDate);
             document.getElementById('endDate').value = formatToYMD(globalMaxDate);
@@ -446,7 +482,6 @@
                         if (!globalGalleries[safeId]) globalGalleries[safeId] = [];
                         let rawPath = props.Field2 || props.Photo_Path || "";
                         let fixedPath = rawPath.replace(/\\\\/g, '/').replace(/\\/g, '/');
-                        
                         let isDuplicate = globalGalleries[safeId].some(img => img.Photo_Path === fixedPath);
                         
                         if (!isDuplicate && fixedPath !== "") {
@@ -527,65 +562,61 @@
                 }, 200); 
             }
         }
-// --- DISTANCE MATH (Haversine Formula) ---
-function getDistance(lat1, lon1, lat2, lon2) {
-    var R = 6371e3; // Earth radius in meters
-    var φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
-    var Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
-    var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-}
-
-// --- SEARCH LOGIC ---
-async function performSearch() {
-    let query = document.getElementById('addressSearch').value;
-    if (!query) return;
-
-    // 1. Ask Esri for coordinates (Massively more accurate for Edmonton's grid)
-    try {
-        let response = await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query + ", Edmonton, AB")}&maxLocations=1`);
-        let data = await response.json();
-
-        if (!data.candidates || data.candidates.length === 0) {
-            alert("Address not found. Try adding 'St' or 'Ave' (e.g., 10420 124 St).");
-            return;
+        
+        // --- DISTANCE MATH (Haversine Formula) ---
+        function getDistance(lat1, lon1, lat2, lon2) {
+            var R = 6371e3; 
+            var φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+            var Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
+            var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
         }
 
-        // Esri returns location as x (lng) and y (lat)
-        let searchLat = data.candidates[0].location.y;
-        let searchLng = data.candidates[0].location.x;
+        // --- SEARCH LOGIC ---
+        async function performSearch() {
+            let query = document.getElementById('addressSearch').value;
+            if (!query) return;
 
-        // 2. Find the closest visible permit on your map
-        let shortestDistance = Infinity;
-        let closestLayer = null;
+            try {
+                let response = await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query + ", Edmonton, AB")}&maxLocations=1`);
+                let data = await response.json();
 
-        currentInfillLayer.eachLayer(function(layer) {
-            if (layer.feature && layer.feature.geometry) {
-                let fLng = layer.feature.geometry.coordinates[0];
-                let fLat = layer.feature.geometry.coordinates[1];
-                let dist = getDistance(searchLat, searchLng, fLat, fLng);
-                
-                if (dist < shortestDistance) {
-                    shortestDistance = dist;
-                    closestLayer = layer;
+                if (!data.candidates || data.candidates.length === 0) {
+                    alert("Address not found. Try adding 'St' or 'Ave' (e.g., 10420 124 St).");
+                    return;
                 }
+
+                let searchLat = data.candidates[0].location.y;
+                let searchLng = data.candidates[0].location.x;
+
+                let shortestDistance = Infinity;
+                let closestLayer = null;
+
+                currentInfillLayer.eachLayer(function(layer) {
+                    if (layer.feature && layer.feature.geometry) {
+                        let fLng = layer.feature.geometry.coordinates[0];
+                        let fLat = layer.feature.geometry.coordinates[1];
+                        let dist = getDistance(searchLat, searchLng, fLat, fLng);
+                        
+                        if (dist < shortestDistance) {
+                            shortestDistance = dist;
+                            closestLayer = layer;
+                        }
+                    }
+                });
+
+                if (shortestDistance <= 250 && closestLayer) {
+                    let coords = closestLayer.feature.geometry.coordinates;
+                    map.flyTo([coords[1], coords[0]], 16); 
+                    closestLayer.openPopup();
+                } else {
+                    alert("No matching site found nearby. (Note: Ensure your date/unit filters aren't hiding it!)");
+                }
+            } catch (error) {
+                console.error("Search error:", error);
+                alert("Search service is temporarily unavailable.");
             }
-        });
-
-        // 3. Zoom if within 250 meters, otherwise error
-        if (shortestDistance <= 250 && closestLayer) {
-            let coords = closestLayer.feature.geometry.coordinates;
-            map.flyTo([coords[1], coords[0]], 16); // <-- Changed from 18 to 16
-            closestLayer.openPopup();
-        } else {
-            alert("No matching site found nearby. (Note: Ensure your date/unit filters aren't hiding it!)");
         }
-    } catch (error) {
-        console.error("Search error:", error);
-        alert("Search service is temporarily unavailable.");
-    }
-}
-
     </script>
 </body>
 </html>
