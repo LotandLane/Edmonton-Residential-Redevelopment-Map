@@ -175,7 +175,10 @@
                 <div id="btnDensity" class="mode-btn" onclick="setMapMode('density')" title="Colors dots by intensity (net units/ha). Dot size indicates physical lot area.">
                     <span style="font-size: 16px;">🌡️</span> Density
                 </div>
-            </div>
+           	<div id="btnKDE" class="mode-btn" onclick="setMapMode('kde')" title="Displays the static KDE heatmap.">
+  	  <span style="font-size: 16px;">🔥</span> Heatmap
+		</div>
+ 	</div>
             <!-- Gear Icon for Extra Settings -->
             <div id="leftGearBtn" class="icon-btn" onclick="toggleLeftDrawer()" title="Visual Settings">
                 ⚙️
@@ -183,51 +186,20 @@
         </div>
         
         <!-- Collapsible Visual Settings Drawer -->
-        <div id="leftSettingsDrawer">
-    <label id="legacyToggleContainer" style="font-size: 12px; color: #ccc; display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" id="legacyToggle" onchange="toggleLegacyMode()" style="margin: 0 6px 0 0; cursor: pointer;">
-        Legacy Mode: Yellow Conversions
-    </label>
-    <label style="font-size: 12px; color: #ccc; display: flex; align-items: center; cursor: pointer; margin-top: 6px;">
-        <input type="checkbox" id="photoHighlightToggle" checked onchange="applyFilters()" style="margin: 0 6px 0 0; cursor: pointer;">
-        Highlight sites with photos
-    </label>
-</div>
-    </div>
-    
-    <!-- TOP RIGHT: MAP FILTERS -->
-    <div id="filterWindow" class="drawer-container">
-        <div class="drawer-header" onclick="toggleDrawer('mapDrawer')" style="border-radius: 4px;">
-            <span>Map Filters</span>
-            <span id="mapChevron">▲</span>
-        </div>
-        <div id="mapDrawerContent" class="drawer-content" style="display: block;">
-            
-            <div style="display: flex; gap: 5px; margin-bottom: 12px; border-bottom: 1px solid #555; padding-bottom: 12px;">
-                <input type="text" id="addressSearch" placeholder="Search Address..." onkeypress="if(event.key === 'Enter') performSearch()" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 6px; font-size: 13px;">
-                <button onclick="performSearch()" style="background: #1f78b4; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-weight: bold;">🔍</button>
-            </div>
+    <div id="leftSettingsDrawer" style="display: none; background: rgba(34, 34, 34, 0.95); border: 1px solid #555; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-family: sans-serif; padding: 15px; flex-direction: column; gap: 12px; width: 230px;">
+        <strong style="color: white; font-size: 14px; border-bottom: 1px solid #555; padding-bottom: 8px;">Map Settings & Overlays</strong>
 
-            <label style="font-size: 12px; color: #ccc;">Project Scope:</label>
-            <select id="scopeFilter" class="filter-dropdown" onchange="applyFilters()">
-                <option value="all">All Projects</option>
-                <option value="new">New Builds Only</option>
-                <option value="conversion">Conversions / Renovations Only</option>
-            </select>
-            
-            <div style="margin-top: 5px; border-top: 1px solid #555; padding-top: 10px;">
-                <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Permit Date:</label>
-                <div class="filter-row"><input type="date" id="startDate" onchange="applyFilters()" style="width: 100%;"></div>
-                <div class="filter-row"><input type="date" id="endDate" onchange="applyFilters()" style="width: 100%;"></div>
-            </div>
-            
-            <div style="margin-top: 5px; border-top: 1px solid #555; padding-top: 10px;">
-                <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Number of Units:</label>
-                <div style="display: flex; gap: 5px;">
-                    <input type="number" id="minUnits" placeholder="Min" onchange="applyFilters()" onkeyup="applyFilters()" style="width: 50%;">
-                    <input type="number" id="maxUnits" placeholder="Max" onchange="applyFilters()" onkeyup="applyFilters()" style="width: 50%;">
-                </div>
-            </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #555; padding-top: 12px;">
+            <span style="font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold;">Point Data Settings</span>
+            <label id="legacyToggleContainer" style="font-size: 12px; color: #ccc; display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="legacyToggle" onchange="toggleLegacyMode()" style="margin: 0 6px 0 0; cursor: pointer;">
+                Legacy Mode: Yellow Conversions
+            </label>
+            <label id="photoHighlightContainer" style="font-size: 12px; color: #ccc; display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="photoHighlightToggle" checked onchange="applyFilters()" style="margin: 0 6px 0 0; cursor: pointer;">
+                Highlight sites with photos
+            </label>
+        </div>
 <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
     <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 6px;">Transit Overlays:</label>
     <label style="font-size: 12px; color: #fff; display: flex; align-items: center; cursor: pointer; margin-bottom: 6px;">
@@ -243,25 +215,77 @@
         Show LRT Walk Sheds (5/10 min)
     </label>
 </div>
+    </div>
+</div>
+    
+    <!-- TOP RIGHT: MAP FILTERS -->
+    <div id="filterWindow" class="drawer-container">
+        <div class="drawer-header" onclick="toggleDrawer('mapDrawer')" style="border-radius: 4px;">
+            <span>Map Filters</span>
+            <span id="mapChevron">▲</span>
+        </div>
+        <div id="mapDrawerContent" class="drawer-content" style="display: block;">
+            
+            <div id="addressSearchContainer" style="display: flex; gap: 5px; margin-bottom: 12px; border-bottom: 1px solid #555; padding-bottom: 12px;">
+    <input type="text" id="addressSearch" placeholder="Search Address..." onkeypress="if(event.key === 'Enter') performSearch()" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 6px; font-size: 13px;">
+                <button onclick="performSearch()" style="background: #1f78b4; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-weight: bold;">🔍</button>
+            </div>
+
+            <div id="scopeFilterContainer">
+    <label style="font-size: 12px; color: #ccc;">Project Scope:</label>
+    <select id="scopeFilter" class="filter-dropdown" onchange="applyFilters()">
+        <option value="all">All Projects</option>
+        <option value="new">New Builds Only</option>
+        <option value="conversion">Conversions / Additions Only</option>
+    </select>
+</div>
+            
+            <div style="margin-top: 5px; border-top: 1px solid #555; padding-top: 10px;">
+    <!-- Interactive Date Pickers (Shown during normal map modes) -->
+    <div id="interactiveDateContainer">
+        <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Permit Date:</label>
+        <div class="filter-row"><input type="date" id="startDate" onchange="applyFilters()" style="width: 100%;"></div>
+        <div class="filter-row"><input type="date" id="endDate" onchange="applyFilters()" style="width: 100%;"></div>
+    </div>
+    
+    <!-- Static Text (Shown only during Heatmap mode) -->
+    <div id="staticDateContainer" style="display: none; font-size: 12px; color: #ccc; line-height: 1.4;">
+        <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Permit Date:</label>
+        <strong style="color: white;">June 16, 2023 to October 7, 2026</strong>
+    </div>
+</div>
+            
+            <div id="unitFilterContainer" style="margin-top: 5px; border-top: 1px solid #555; padding-top: 10px;">
+    <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 4px;">Number of Units:</label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="number" id="minUnits" placeholder="Min" onchange="applyFilters()" onkeyup="applyFilters()" style="width: 50%;">
+                    <input type="number" id="maxUnits" placeholder="Max" onchange="applyFilters()" onkeyup="applyFilters()" style="width: 50%;">
+                </div>
+            </div>
+
 
 <!-- Existing Animation Mode code starts here -->
 <div style="margin-top: 10px; border-top: 1px solid #555; padding-top: 10px;">
-    <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 6px;">Animation Mode:</label>
-    <select id="animMode" onchange="document.getElementById('pulseSettings').style.display = (this.value === 'pulse') ? 'block' : 'none';" class="filter-dropdown">
-        <option value="cumulative">Cumulative (Snowball)</option>
-        <option value="pulse">Rolling Pulse</option>
-    </select>
-                
-                <div id="pulseSettings" style="display: none; margin-bottom: 8px;">
-                    <label style="font-size: 12px; color: #ccc;">Window Size (Days):</label>
-                    <input type="number" id="pulseDays" value="90" min="7" max="730" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 4px; margin-top: 3px; box-sizing: border-box;">
-                </div>
-
-                <button id="playBtn" onclick="togglePlayback()" style="width: 100%; background: #33a02c; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-bottom: 5px;">▶ Play Animation</button>
-                <button onclick="resetFilters()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold;">Reset All Filters</button>
-            </div>
+    
+    <div id="animationContainer">
+        <label style="font-size: 12px; color: #ccc; display: block; margin-bottom: 6px;">Animation Mode:</label>
+        <select id="animMode" onchange="document.getElementById('pulseSettings').style.display = (this.value === 'pulse') ? 'block' : 'none';" class="filter-dropdown">
+            <option value="cumulative">Cumulative (Snowball)</option>
+            <option value="pulse">Rolling Pulse</option>
+        </select>
+        
+        <div id="pulseSettings" style="display: none; margin-bottom: 8px;">
+            <label style="font-size: 12px; color: #ccc;">Window Size (Days):</label>
+            <input type="number" id="pulseDays" value="90" min="7" max="730" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 4px; margin-top: 3px; box-sizing: border-box;">
         </div>
+
+        <button id="playBtn" onclick="togglePlayback()" style="width: 100%; background: #33a02c; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-bottom: 5px;">▶ Play Animation</button>
     </div>
+    
+    <button onclick="resetFilters()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold;">Reset All Filters</button>
+</div>
+</div>
+</div>
 
     <!-- BOTTOM RIGHT: DATA LEGEND -->
     <div id="typologyWindow" class="drawer-container">
@@ -301,8 +325,22 @@
 </div>
 
             <div style="margin-top: 10px; font-size: 11px; color: #aaa; border-top: 1px solid #555; padding-top: 6px; line-height: 1.6;">
-                <div id="sizeLegendText">
-                    Dot size indicates <strong>units</strong>.<br>
+            <!-- HEATMAP LEGEND -->
+        <div id="kdeLegendView" style="display:none; flex-direction:column; margin-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #ccc; margin-bottom: 4px;">
+                <span>Low</span>
+                <span>High Concentration</span>
+            </div>
+            
+            <!-- Custom Magma Gradient matching your QGIS 0-20% opacity ramp -->
+            <div style="height: 12px; width: 100%; border-radius: 2px; border: 1px solid #000; background: linear-gradient(to right, rgba(0, 0, 4, 0) 0%, rgba(59, 15, 112, 1) 20%, rgba(140, 41, 129, 1) 40%, rgba(222, 73, 104, 1) 60%, rgba(254, 159, 109, 1) 80%, rgba(252, 253, 191, 1) 100%); margin-bottom: 10px;"></div>
+            
+            <div style="font-size: 11px; color: #aaa; line-height: 1.4;">
+                <strong>Note:</strong> This heatmap illustrates broad spatial trends by blending nearby permits. Colors represent relative regional momentum, not exact lot boundaries or specific unit counts.
+            </div>
+        </div>    
+		<div id="sizeLegendText">
+                    Dot size indicates <strong>base units</strong>.<br>
                 </div>
                 <div style="margin-top:2px; transition: opacity 0.3s;" id="photoLegendText">
                     <span style="color:#fff; font-weight:bold;">&compfn; White outline</span> indicates photo available.
@@ -363,21 +401,60 @@ function toggleIsochroneLayer() {
         map.removeLayer(isochroneLayer);
     }
 }
-        function setMapMode(mode) {
-            currentMapMode = mode;
-            if (mode === 'typology') {
-                document.getElementById('btnTypology').classList.add('active');
-                document.getElementById('btnDensity').classList.remove('active');
-                document.getElementById('legacyToggleContainer').style.display = 'flex'; // Show legacy toggle
-            } else {
-                document.getElementById('btnDensity').classList.add('active');
-                document.getElementById('btnTypology').classList.remove('active');
-                document.getElementById('legacyToggleContainer').style.display = 'none'; // Hide legacy toggle
-            }
-            toggleLegendView();
-            applyFilters();
-        }
+       function setMapMode(mode) {
+    currentMapMode = mode;
+    
+    // 1. Reset all buttons
+    document.getElementById('btnTypology').classList.remove('active');
+    document.getElementById('btnDensity').classList.remove('active');
+    document.getElementById('btnKDE').classList.remove('active');
+    
+    // 2. Safely grab all UI containers we might want to hide/show
+    let legacyToggle = document.getElementById('legacyToggleContainer');
+    let interactiveDate = document.getElementById('interactiveDateContainer');
+    let staticDate = document.getElementById('staticDateContainer');
+    let animationUI = document.getElementById('animationContainer');
+    let scopeUI = document.getElementById('scopeFilterContainer');
+    let photoUI = document.getElementById('photoHighlightContainer');
+    let unitUI = document.getElementById('unitFilterContainer');
+    let addressUI = document.getElementById('addressSearchContainer'); // <-- Added
 
+    // 3. Set the active button and UI visibility
+    if (mode === 'typology' || mode === 'density') {
+        if (mode === 'typology') {
+            document.getElementById('btnTypology').classList.add('active');
+            if (legacyToggle) legacyToggle.style.display = 'flex';
+        } else {
+            document.getElementById('btnDensity').classList.add('active');
+            if (legacyToggle) legacyToggle.style.display = 'none';
+        }
+        
+        // Show interactive filters
+        if (interactiveDate) interactiveDate.style.display = 'block';
+        if (staticDate) staticDate.style.display = 'none';
+        if (animationUI) animationUI.style.display = 'block';
+        if (scopeUI) scopeUI.style.display = 'block';
+        if (photoUI) photoUI.style.display = 'flex';
+        if (unitUI) unitUI.style.display = 'block';
+        if (addressUI) addressUI.style.display = 'flex'; // <-- Show Address Search
+        
+    } else if (mode === 'kde') {
+        document.getElementById('btnKDE').classList.add('active');
+        if (legacyToggle) legacyToggle.style.display = 'none';
+        
+        // Hide interactive filters, show static text
+        if (interactiveDate) interactiveDate.style.display = 'none';
+        if (staticDate) staticDate.style.display = 'block';
+        if (animationUI) animationUI.style.display = 'none';
+        if (scopeUI) scopeUI.style.display = 'none';
+        if (photoUI) photoUI.style.display = 'none';
+        if (unitUI) unitUI.style.display = 'none';
+        if (addressUI) addressUI.style.display = 'none'; // <-- Hide Address Search
+    }
+    
+    toggleLegendView();
+    applyFilters();
+}
         function toggleDrawer(drawerId) {
             let drawerContent, chevron;
             if (drawerId === 'mapDrawer') {
@@ -397,23 +474,32 @@ function toggleIsochroneLayer() {
         }
 
         function toggleLegendView() {
-            let typeView = document.getElementById('typologyLegendView');
-            let densView = document.getElementById('densityLegendView');
-            let legTitle = document.getElementById('legendTitle');
-            let sizeLegend = document.getElementById('sizeLegendText');
+    let typeView = document.getElementById('typologyLegendView');
+    let densView = document.getElementById('densityLegendView');
+    let kdeView = document.getElementById('kdeLegendView');
+    let legTitle = document.getElementById('legendTitle');
+    let sizeLegend = document.getElementById('sizeLegendText');
 
-            if (currentMapMode === 'density') {
-                typeView.style.display = 'none';
-                densView.style.display = 'flex';
-                legTitle.innerText = "Density Legend";
-                sizeLegend.innerHTML = "Dot size indicates <strong>Site Area (ha)</strong>.<br>";
-            } else {
-                typeView.style.display = 'flex';
-                densView.style.display = 'none';
-                legTitle.innerText = "Filter Typology";
-                sizeLegend.innerHTML = "Dot size indicates <strong>units</strong>.<br>";
-            }
-        }
+    if (currentMapMode === 'density') {
+        typeView.style.display = 'none';
+        densView.style.display = 'flex';
+        if (kdeView) kdeView.style.display = 'none';
+        legTitle.innerText = "Density Legend";
+        sizeLegend.innerHTML = "Dot size indicates <strong>Site Area (ha)</strong>.<br>";
+    } else if (currentMapMode === 'typology') {
+        typeView.style.display = 'flex';
+        densView.style.display = 'none';
+        if (kdeView) kdeView.style.display = 'none';
+        legTitle.innerText = "Filter Typology";
+        sizeLegend.innerHTML = "Dot size indicates <strong>base units</strong>.<br>";
+    } else if (currentMapMode === 'kde') {
+        typeView.style.display = 'none';
+        densView.style.display = 'none';
+        if (kdeView) kdeView.style.display = 'flex';
+        legTitle.innerText = "Development Momentum";
+        sizeLegend.innerHTML = ""; // Cleared because the KDE div contains its own explanatory text
+    }
+}
 
         function toggleLegacyMode() {
             let legacyOn = document.getElementById('legacyToggle').checked;
@@ -441,12 +527,27 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_D
             attribution: 'Tiles &copy; Esri | Data: <a href="https://data.edmonton.ca" target="_blank">City of Edmonton</a>',
             maxZoom: 16
         }).addTo(map);
+// Create a custom pane for the KDE raster to sit underneath the transit polygons
+map.createPane('kdePane');
+map.getPane('kdePane').style.zIndex = 380;
 
-        // --- GLOBAL DATA & HELPERS ---
-        let lrtLayer = null;
-	let bufferLayer = null;
-	let isochroneLayer = null;
-	let globalGalleries = {}; 
+// --- GLOBAL DATA & HELPERS ---
+let lrtLayer = null;
+let bufferLayer = null;
+let isochroneLayer = null;
+let globalGalleries = {}; 
+
+// 1. Create a custom pane for the KDE raster to sit underneath the transit polygons
+map.createPane('kdePane');
+map.getPane('kdePane').style.zIndex = 380;
+
+// 2. Load the exported QGIS tiles
+let kdeLayer = L.tileLayer('kde_tiles/{z}/{x}/{y}.png', { 
+    pane: 'kdePane',
+    opacity: 0.85,
+    minZoom: 10,
+    maxZoom: 16
+});
         let masterInfillData = null;  
         let currentInfillLayer = null; 
         let globalMinDate = Infinity;
@@ -677,7 +778,7 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_D
                         displayType = effType;
                     } else {
                         let isConv = isConversion(props);
-                        let scopeText = isConv ? "Conversion / Renovation" : "New Build";
+                        let scopeText = isConv ? "Conversion / Addition" : "New Build";
                         displayType = `${effType} (${scopeText})`;
                     }
 
@@ -700,7 +801,7 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_D
                             <span style="font-size: 12px; color: #777; display: block; margin-bottom: 8px;">${displayType}</span>
                             <p style="margin: 0 0 10px 0; color: #555; font-size: 13px; line-height: 1.4;">
                                 <strong>Permit Date:</strong> ${permitDate}<br>
-                                <strong>Units:</strong> ${featureUnits}
+                                <strong>Base Units:</strong> ${featureUnits}
                                 ${suiteText}
                                 ${areaText}
                                 ${densText}
@@ -738,8 +839,22 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_D
                     popupContent += `</div>`;
                     layer.bindPopup(popupContent);
                 }
-            }).addTo(map);
+    });
+
+    // Only draw the dots if we are NOT in Heatmap mode
+    if (currentMapMode !== 'kde') {
+        currentInfillLayer.addTo(map);
+    }
+
+    // Toggle the KDE image overlay on or off
+    if (kdeLayer) {
+        if (currentMapMode === 'kde') {
+            map.addLayer(kdeLayer);
+        } else {
+            map.removeLayer(kdeLayer);
         }
+    }
+} //END OF APPLY FILTERS
 
         function resetFilters() {
             document.getElementById('startDate').value = formatToYMD(globalMinDate);
@@ -1051,7 +1166,6 @@ if (isochroneData && isochroneData.features && isochroneData.features.length > 0
             }
         }
     </script>
-
 
 </body>
 </html>
