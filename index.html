@@ -5,7 +5,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
         body { margin: 0; padding: 0; }
         #map { width: 100vw; height: 100vh; background: #222222; }
 
@@ -153,7 +154,64 @@
             
             .icon-btn { width: 34px !important; height: 34px !important; font-size: 18px !important; padding: 0 !important; display: flex !important; justify-content: center !important; align-items: center !important; line-height: 1 !important; text-align: center !important; }
             #leftSettingsDrawer { position: absolute !important; left: 45px !important; bottom: 0 !important; }
+        /* --- REPORT MODAL MOBILE OPTIMIZATIONS --- */
+            #reportContent { 
+                width: 95% !important; 
+                max-height: 90% !important; /* Swapped vh for % to respect the simulator container */
+                padding: 20px 15px !important; 
+                margin: auto !important; /* Prevents flexbox from cutting off the top */
+            }
+            #reportTitle { font-size: 18px !important; padding-right: 25px !important; }
+            
+            /* 1. Top 4 metrics: Create a 2x2 grid to save vertical space */
+            #reportContent > div:nth-of-type(2) { gap: 10px !important; margin-bottom: 15px !important; }
+            #reportContent > div:nth-of-type(2) .stat-box { min-width: 40% !important; padding: 12px 5px !important; margin: 0 !important; }
+            .stat-value { font-size: 18px !important; }
+            .stat-label { font-size: 10px !important; }
+            
+            /* 2. Chart and Notable Projects: Force vertical stacking */
+            #reportContent > div:nth-of-type(3) { flex-direction: column !important; gap: 15px !important; margin-bottom: 15px !important; }
+            #reportContent > div:nth-of-type(3) > div { min-width: 100% !important; box-sizing: border-box !important; }
+            
+            /* 3. Scale the chart down so it doesn't force scrolling */
+            #reportContent canvas { max-height: 180px !important; }
+            
+            /* 4. Action Buttons: Stack them full-width for easier thumb tapping */
+            #reportContent > div:nth-of-type(4) { flex-direction: column !important; gap: 8px !important; padding-top: 15px !important; }
+            #reportContent > div:nth-of-type(4) button { width: 100% !important; margin: 0 !important; }
+	}
+/* --- REPORT MODAL & PRINT STYLES --- */
+    #reportModal {
+        display: none; position: fixed; z-index: 9999; left: 0; top: 0; 
+        width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.9); 
+        justify-content: center; align-items: center; font-family: sans-serif;
+    }
+    #reportContent {
+        background: #222; color: white; width: 90%; max-width: 850px; 
+        max-height: 90vh; overflow-y: auto; border-radius: 6px; padding: 30px; 
+        border: 1px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.8); position: relative;
+    }
+    .stat-box {
+        background: #333; padding: 15px; border-radius: 4px; border: 1px solid #444; flex: 1; min-width: 120px; text-align: center;
+    }
+    .stat-value { font-size: 24px; font-weight: bold; color: #1f78b4; margin-bottom: 5px; }
+    .stat-label { font-size: 11px; color: #ccc; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    @media print {
+        body * { visibility: hidden !important; }
+        #reportModal, #reportModal * { visibility: visible !important; }
+        #reportModal { position: absolute; left: 0; top: 0; background: white !important; }
+        #reportContent { 
+            background: white !important; color: black !important; 
+            box-shadow: none !important; border: none !important; width: 100% !important; 
+            max-height: none !important; overflow: visible !important; padding: 0 !important;
         }
+        .stat-box { background: #f5f5f5 !important; border: 1px solid #ddd !important; }
+        .stat-label { color: #555 !important; }
+        .stat-value { color: #000 !important; }
+        .no-print { display: none !important; }
+        canvas { max-height: 300px !important; }
+    }
     </style>
 </head>
 <body>
@@ -230,6 +288,15 @@
     <input type="text" id="addressSearch" placeholder="Search Address..." onkeypress="if(event.key === 'Enter') performSearch()" style="width: 100%; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 6px; font-size: 13px;">
                 <button onclick="performSearch()" style="background: #1f78b4; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-weight: bold;">🔍</button>
             </div>
+	<div id="locationFilterContainer" style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; border-bottom: 1px solid #555; padding-bottom: 12px;">
+            <label style="font-size: 12px; color: #ccc;">Filter by Area:</label>
+            
+            <input list="districtList" id="districtSearch" placeholder="Select District..." oninput="updateLocationDropdowns(); applyFilters();" style="width: 100%; box-sizing: border-box; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 6px; font-size: 13px;">
+        <datalist id="districtList"></datalist>
+
+        <input list="nbhdList" id="nbhdSearch" placeholder="Select Neighbourhood..." oninput="applyFilters()" style="width: 100%; box-sizing: border-box; background: #333; color: white; border: 1px solid #777; border-radius: 3px; padding: 6px; font-size: 13px; margin-top: 4px;">
+        <datalist id="nbhdList"></datalist>
+        </div>
 
             <div id="scopeFilterContainer">
     <label style="font-size: 12px; color: #ccc;">Project Scope:</label>
@@ -281,7 +348,7 @@
 
         <button id="playBtn" onclick="togglePlayback()" style="width: 100%; background: #33a02c; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-bottom: 5px;">▶ Play Animation</button>
     </div>
-    
+    <button onclick="generateReport()" style="width: 100%; background: #984ea3; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold; margin-bottom: 5px; margin-top: 5px;">📊 Generate Area Report</button>
     <button onclick="resetFilters()" style="width: 100%; background: #1f78b4; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-weight: bold;">Reset All Filters</button>
 </div>
 </div>
@@ -336,14 +403,14 @@
             <div style="height: 12px; width: 100%; border-radius: 2px; border: 1px solid #000; background: linear-gradient(to right, rgba(0, 0, 4, 0) 0%, rgba(59, 15, 112, 1) 20%, rgba(140, 41, 129, 1) 40%, rgba(222, 73, 104, 1) 60%, rgba(254, 159, 109, 1) 80%, rgba(252, 253, 191, 1) 100%); margin-bottom: 10px;"></div>
             
             <div style="font-size: 11px; color: #aaa; line-height: 1.4;">
-                <strong>Note:</strong> This heatmap illustrates broad spatial trends by blending nearby permits. Colors represent concentration of units, not exact lot boundaries or specific unit counts.
+                <strong>Note:</strong> This heatmap illustrates broad spatial trends by blending nearby permits. Colors represent relative regional momentum, not exact lot boundaries or specific unit counts.
             </div>
         </div>    
 		<div id="sizeLegendText">
-                    Dot size indicates <strong>base units</strong>.<br>
+                    Dot size indicates <strong>units</strong>.<br>
                 </div>
                 <div style="margin-top:2px; transition: opacity 0.3s;" id="photoLegendText">
-                    <span style="color:#fff; font-weight:bold;">&compfn; White outline</span> indicates photo available.
+                    <span style="color:#fff; font-weight:bold;">&cir; White outline</span> indicates photo available.
                 </div>
             </div>
         </div>
@@ -360,7 +427,42 @@
         <span id="nextArrow" class="gallery-arrow" onclick="changePhoto(1, event)">&#10095;</span>
         <div id="galleryCaption"></div>
     </div>
+	<div id="reportModal" onclick="if(event.target.id === 'reportModal') this.style.display='none'">
+    <div id="reportContent">
+        <span onclick="document.getElementById('reportModal').style.display='none'" class="no-print" style="position: absolute; top: 15px; right: 20px; color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; z-index: 10;">&times;</span>
+        
+        <div style="border-bottom: 1px solid #555; padding-bottom: 15px; margin-bottom: 20px;">
+            <h2 style="margin: 0 0 5px 0; color: #fff;" id="reportTitle">Residential Redevelopment Area Report</h2>
+            <div id="reportContext" style="font-size: 13px; color: #aaa;"></div>
+        </div>
 
+        <div style="display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;">
+            <div class="stat-box"><div class="stat-value" id="repTotalSites">0</div><div class="stat-label">Total Sites</div></div>
+            <div class="stat-box"><div class="stat-value" id="repTotalUnits">0</div><div class="stat-label">Total Units</div></div>
+            <div class="stat-box"><div class="stat-value" id="repAvgDensity">0</div><div class="stat-label">Net Density (u/ha)</div></div>
+            <div class="stat-box"><div class="stat-value" id="repTodMetric">0%</div><div class="stat-label">Within 800m of LRT</div></div>
+        </div>
+
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+            <div style="flex: 1; min-width: 300px; background: #333; padding: 15px; border-radius: 4px; border: 1px solid #444;" class="stat-box">
+                <h3 style="margin: 0 0 15px 0; font-size: 14px; text-align: left; color: #fff;" id="chartTitle">Distribution</h3>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="reportChartCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div style="flex: 1; min-width: 300px; background: #333; padding: 15px; border-radius: 4px; border: 1px solid #444;" class="stat-box">
+                <h3 style="margin: 0 0 15px 0; font-size: 14px; text-align: left; color: #fff;">Notable Projects (By Scale)</h3>
+                <div id="reportTopList" style="text-align: left; font-size: 13px; line-height: 1.6; color: #ccc;"></div>
+            </div>
+        </div>
+
+        <div class="no-print" style="display: flex; gap: 10px; border-top: 1px solid #555; padding-top: 20px;">
+            <button onclick="window.print()" style="background: #1f78b4; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">🖨️ Print to PDF</button>
+            <button onclick="exportCSV()" style="background: #33a02c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">📥 Export Raw CSV</button>
+        </div>
+    </div>
+</div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         let currentMapMode = 'typology'; // Global state for the active view
@@ -417,7 +519,8 @@ function toggleIsochroneLayer() {
     let scopeUI = document.getElementById('scopeFilterContainer');
     let photoUI = document.getElementById('photoHighlightContainer');
     let unitUI = document.getElementById('unitFilterContainer');
-    let addressUI = document.getElementById('addressSearchContainer'); // <-- Added
+    let addressUI = document.getElementById('addressSearchContainer');
+    let locationUI = document.getElementById('locationFilterContainer');
 
     // 3. Set the active button and UI visibility
     if (mode === 'typology' || mode === 'density') {
@@ -436,7 +539,8 @@ function toggleIsochroneLayer() {
         if (scopeUI) scopeUI.style.display = 'block';
         if (photoUI) photoUI.style.display = 'flex';
         if (unitUI) unitUI.style.display = 'block';
-        if (addressUI) addressUI.style.display = 'flex'; // <-- Show Address Search
+        if (addressUI) addressUI.style.display = 'flex';
+	if (locationUI) locationUI.style.display = 'flex';
         
     } else if (mode === 'kde') {
         document.getElementById('btnKDE').classList.add('active');
@@ -449,7 +553,8 @@ function toggleIsochroneLayer() {
         if (scopeUI) scopeUI.style.display = 'none';
         if (photoUI) photoUI.style.display = 'none';
         if (unitUI) unitUI.style.display = 'none';
-        if (addressUI) addressUI.style.display = 'none'; // <-- Hide Address Search
+        if (addressUI) addressUI.style.display = 'none';
+	if (locationUI) locationUI.style.display = 'none'; 
     }
     
     toggleLegendView();
@@ -491,7 +596,7 @@ function toggleIsochroneLayer() {
         densView.style.display = 'none';
         if (kdeView) kdeView.style.display = 'none';
         legTitle.innerText = "Filter Typology";
-        sizeLegend.innerHTML = "Dot size indicates <strong>base units</strong>.<br>";
+        sizeLegend.innerHTML = "Dot size indicates <strong>units</strong>.<br>";
     } else if (currentMapMode === 'kde') {
         typeView.style.display = 'none';
         densView.style.display = 'none';
@@ -537,9 +642,71 @@ let bufferLayer = null;
 let isochroneLayer = null;
 let globalGalleries = {}; 
 
+let locationHierarchy = {}; // Stores { "Scona": Set(["Garneau", "Strathcona"...]) }
+
+    function buildLocationHierarchy() {
+        locationHierarchy = {};
+        let allNbhds = new Set();
+
+        masterInfillData.features.forEach(feature => {
+            let props = feature.properties;
+            let dist = props.District || props.district || props.DISTRICT;
+            let nbhd = props.NBHD || props.nbhd || props.Nbhd || props.Neighbourhood;
+
+            if (dist && nbhd) {
+                let dStr = String(dist).trim();
+                let nStr = String(nbhd).trim();
+
+                if (!locationHierarchy[dStr]) locationHierarchy[dStr] = new Set();
+                locationHierarchy[dStr].add(nStr);
+                allNbhds.add(nStr);
+            }
+        });
+
+        // Populate initial District List
+        let distListEl = document.getElementById('districtList');
+        distListEl.innerHTML = '';
+        Object.keys(locationHierarchy).sort().forEach(d => {
+            distListEl.appendChild(new Option(d, d));
+        });
+
+        // Populate initial full Neighbourhood List
+        let nbhdListEl = document.getElementById('nbhdList');
+        nbhdListEl.innerHTML = '';
+        Array.from(allNbhds).sort().forEach(n => {
+            nbhdListEl.appendChild(new Option(n, n));
+        });
+    }
+
+    function updateLocationDropdowns() {
+        let selectedDist = document.getElementById('districtSearch').value;
+        let nbhdListEl = document.getElementById('nbhdList');
+        let nbhdInput = document.getElementById('nbhdSearch');
+
+        nbhdListEl.innerHTML = ''; // Clear options
+
+        if (selectedDist && locationHierarchy[selectedDist]) {
+            // Populate restricted list
+            Array.from(locationHierarchy[selectedDist]).sort().forEach(n => {
+                nbhdListEl.appendChild(new Option(n, n));
+            });
+            
+            // Clear the neighbourhood input if it conflicts with the new district
+            if (nbhdInput.value && !locationHierarchy[selectedDist].has(nbhdInput.value)) {
+                nbhdInput.value = '';
+            }
+        } else {
+            // Restore all neighbourhoods if district is cleared
+            let allNbhds = new Set();
+            Object.values(locationHierarchy).forEach(set => set.forEach(n => allNbhds.add(n)));
+            Array.from(allNbhds).sort().forEach(n => {
+                nbhdListEl.appendChild(new Option(n, n));
+            });
+        }
+    }
+
 // 1. Create a custom pane for the KDE raster to sit underneath the transit polygons
-map.createPane('kdePane');
-map.getPane('kdePane').style.zIndex = 380;
+
 
 // 2. Load the exported QGIS tiles
 let kdeLayer = L.tileLayer('kde_tiles/{z}/{x}/{y}.png', { 
@@ -691,7 +858,10 @@ let kdeLayer = L.tileLayer('kde_tiles/{z}/{x}/{y}.png', {
             let scopeFilter = document.getElementById('scopeFilter').value;
             let showPhotoHighlight = document.getElementById('photoHighlightToggle').checked;
 
-            document.getElementById('photoLegendText').style.opacity = showPhotoHighlight ? '1' : '0.3';
+            let selectedDist = document.getElementById('districtSearch').value.toLowerCase().trim();
+            let selectedNbhd = document.getElementById('nbhdSearch').value.toLowerCase().trim();
+
+	    document.getElementById('photoLegendText').style.opacity = showPhotoHighlight ? '1' : '0.3';
 
             let checkboxes = document.querySelectorAll('.type-filter');
             let activeTypes = new Set();
@@ -705,7 +875,13 @@ let kdeLayer = L.tileLayer('kde_tiles/{z}/{x}/{y}.png', {
                 filter: function (feature) {
                     let props = feature.properties;
 
-                    let rawDate = props["Permit Date"] || props.Permit_Date || props.permit_date || props.Date || "";
+                    let fDist = String(props.District || props.district || props.DISTRICT || "").toLowerCase().trim();
+                    let fNbhd = String(props.NBHD || props.nbhd || props.Nbhd || props.Neighbourhood || "").toLowerCase().trim();
+
+                    if (selectedDist && fDist !== selectedDist) return false;
+                    if (selectedNbhd && fNbhd !== selectedNbhd) return false;
+
+		    let rawDate = props["Permit Date"] || props.Permit_Date || props.permit_date || props.Date || "";
                     let featureTime = parseCustomDate(rawDate);
                     if (featureTime && (featureTime < startLimit || featureTime > endLimit)) return false;
 
@@ -801,7 +977,7 @@ let kdeLayer = L.tileLayer('kde_tiles/{z}/{x}/{y}.png', {
                             <span style="font-size: 12px; color: #777; display: block; margin-bottom: 8px;">${displayType}</span>
                             <p style="margin: 0 0 10px 0; color: #555; font-size: 13px; line-height: 1.4;">
                                 <strong>Permit Date:</strong> ${permitDate}<br>
-                                <strong>Base Units:</strong> ${featureUnits}
+                                <strong>Units:</strong> ${featureUnits}
                                 ${suiteText}
                                 ${areaText}
                                 ${densText}
@@ -931,7 +1107,7 @@ let fetchIsochrones = fetch('lrtisochrones.geojson').then(r => {
     return r.json();
 }).catch(error => ({ features: [] }));
 
-// Update the Promise.all array to include fetchIsochrones
+
 Promise.all([fetchInfill, fetchPhotos, fetchLRT, fetchBuffer, fetchIsochrones]).then(([infillData, photosData, lrtData, bufferData, isochroneData]) => {
             
     // 1. Process LRT Data
@@ -1065,12 +1241,13 @@ if (isochroneData && isochroneData.features && isochroneData.features.length > 0
                 }
             });
 
+		buildLocationHierarchy(); 
+
             if (globalMinDate !== Infinity && globalMaxDate !== -Infinity) {
                 document.getElementById('startDate').value = formatToYMD(globalMinDate);
                 document.getElementById('endDate').value = formatToYMD(globalMaxDate);
             }
             
-            // Finally, draw the dots!
             applyFilters();
             
         }).catch(error => {
@@ -1165,7 +1342,228 @@ if (isochroneData && isochroneData.features && isochroneData.features.length > 0
                 }, 200); 
             }
         }
+// --- REPORT & EXPORT ENGINE ---
+    let reportChartInstance = null;
+
+    function generateReport() {
+        if (!currentInfillLayer || !map.hasLayer(currentInfillLayer) && currentMapMode !== 'kde') {
+            alert("Please exit Heatmap mode to generate a precise area report.");
+            return;
+        }
+
+        let visibleFeatures = [];
+        currentInfillLayer.eachLayer(layer => { if (layer.feature) visibleFeatures.push(layer.feature); });
+        
+        if (visibleFeatures.length === 0) {
+            alert("No projects match the current filters. Adjust your search and try again.");
+            return;
+        }
+
+        // 1. Context Header
+        let distFilter = document.getElementById('districtSearch').value || "All Districts";
+        let nbhdFilter = document.getElementById('nbhdSearch').value || "All Neighbourhoods";
+        let scopeFilter = document.getElementById('scopeFilter').options[document.getElementById('scopeFilter').selectedIndex].text;
+
+        // Date String
+        let startD = document.getElementById('startDate').value;
+        let endD = document.getElementById('endDate').value;
+        let dateStr = (startD && endD) ? `${startD} to ${endD}` : "All Dates";
+
+        // Unit String
+        let minU = document.getElementById('minUnits').value;
+        let maxU = document.getElementById('maxUnits').value;
+        let unitStr = "All Unit Counts";
+        if (minU && maxU) unitStr = `${minU} - ${maxU} Units`;
+        else if (minU) unitStr = `${minU}+ Units`;
+        else if (maxU) unitStr = `Up to ${maxU} Units`;
+
+        // Typology String
+        let allTypeBoxes = document.querySelectorAll('.type-filter');
+        let checkedTypes = Array.from(allTypeBoxes).filter(cb => cb.checked);
+        let typeStr = "All Typologies";
+        if (checkedTypes.length < allTypeBoxes.length) {
+            if (checkedTypes.length <= 3) {
+                // List them out if it's a short list
+                typeStr = checkedTypes.map(cb => cb.value).join(', ');
+            } else {
+                // Summarize if it's a long list to avoid header bloat
+                typeStr = `${checkedTypes.length} Typologies Selected`;
+            }
+        }
+
+        // Inject as HTML to allow for a clean line break between Location and Filters
+        document.getElementById('reportContext').innerHTML = `
+            <div style="margin-bottom: 4px;"><strong>Location:</strong> ${distFilter} &bull; ${nbhdFilter}</div>
+            <div style="font-size: 12px;"><strong>Active Filters:</strong> ${scopeFilter} &bull; ${dateStr} &bull; ${unitStr} &bull; ${typeStr}</div>
+        `;
+
+        // 2. Tally Metrics
+        let totalSites = visibleFeatures.length;
+        let totalUnits = 0;
+        let totalKnownArea = 0;
+	let unitsWithKnownArea = 0;
+        let todUnits = 0;
+
+        let typologyCounts = {};
+        let densityBrackets = { '800+':0, '500-799':0, '300-499':0, '150-299':0, '100-149':0, '60-99':0, '25-59':0, '1-24':0 };
+
+        visibleFeatures.forEach(f => {
+            let p = f.properties;
+            let units = parseInt(p.Units || p.units || p.UNITS) || 1;
+            let dens = getDensityVal(p);
+            
+            totalUnits += units;
+            let areaRaw = p["Area (ha)"] || p.Area || p.area;
+let siteArea = parseFloat(areaRaw);
+
+if (siteArea > 0) {
+    totalKnownArea += siteArea;
+    unitsWithKnownArea += units; // Only tally units if we know the lot size so the ratio stays balanced
+}
+
+            // Determine TOD (Distance to any LRT station under 800m)
+                if (lrtLayer) {
+                    let lat = f.geometry.coordinates[1], lng = f.geometry.coordinates[0];
+                    let isTOD = false;
+                    lrtLayer.eachLayer(stn => {
+                        if (isTOD) return;
+                        let stnCoords = stn.getLatLng();
+                        if (getDistance(lat, lng, stnCoords.lat, stnCoords.lng) <= 800) isTOD = true;
+                    });
+                    if (isTOD) todUnits += units; // Add the actual unit count instead of just +1
+                }
+
+            // Chart Sorting
+            if (currentMapMode === 'typology') {
+                let effType = getEffectiveTypology(p);
+                typologyCounts[effType] = (typologyCounts[effType] || 0) + units; 
+            } else {
+                if(dens>=800) densityBrackets['800+']++;
+                else if(dens>=500) densityBrackets['500-799']++;
+                else if(dens>=300) densityBrackets['300-499']++;
+                else if(dens>=150) densityBrackets['150-299']++;
+                else if(dens>=100) densityBrackets['100-149']++;
+                else if(dens>=60)  densityBrackets['60-99']++;
+                else if(dens>=25)  densityBrackets['25-59']++;
+                else densityBrackets['1-24']++;
+            }
+        });
+
+        document.getElementById('repTotalSites').innerText = totalSites;
+        document.getElementById('repTotalUnits').innerText = totalUnits;
+        document.getElementById('repAvgDensity').innerText = totalKnownArea > 0 ? (unitsWithKnownArea / totalKnownArea).toFixed(1) : "N/A";
+        document.getElementById('repTodMetric').innerText = lrtLayer ? Math.round((todUnits / totalUnits) * 100) + "%" : "N/A";
+
+        // 3. Top Projects List
+        let sorted = [...visibleFeatures].sort((a, b) => {
+            let ua = parseInt(a.properties.Units || a.properties.units) || 1;
+            let ub = parseInt(b.properties.Units || b.properties.units) || 1;
+            return ub - ua;
+        }).slice(0, 5);
+
+        let listHtml = sorted.map((f, i) => {
+            let p = f.properties;
+            let addr = p.Address || p.ADDRESS || "Unknown";
+            let type = getEffectiveTypology(p);
+            let u = p.Units || p.units || 1;
+            return `<div style="margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 6px;">
+                        <strong style="color: #fff;">${i+1}. ${addr}</strong><br>
+                        ${u} Units &nbsp;&bull;&nbsp; ${type}
+                    </div>`;
+        }).join('');
+        document.getElementById('reportTopList').innerHTML = listHtml;
+
+        // 4. Render Chart.js
+        let ctx = document.getElementById('reportChartCanvas').getContext('2d');
+        if (reportChartInstance) reportChartInstance.destroy();
+
+        Chart.defaults.color = '#ccc';
+        document.getElementById('chartTitle').innerText = currentMapMode === 'typology' ? "Unit Distribution by Typology" : "Site Density Bracket Distribution";
+
+        if (currentMapMode === 'typology') {
+            let labels = Object.keys(typologyCounts).sort((a,b) => typologyCounts[b] - typologyCounts[a]);
+            let data = labels.map(l => typologyCounts[l]);
+            let bgColors = labels.map(l => getTypologyColor(l));
+
+            reportChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: labels, datasets: [{ data: data, backgroundColor: bgColors, borderColor: '#333', borderWidth: 2 }] },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { 
+                            position: 'bottom', // Moves legend below the chart
+                            labels: { boxWidth: 12, padding: 12, font: { size: 11 } } // Adds breathing room
+                        } 
+                    } 
+                }
+            });
+        } else {
+            let labels = Object.keys(densityBrackets);
+            let data = Object.values(densityBrackets);
+            let bgColors = ['#800026', '#bd0026', '#e31a1c', '#fc4e2a', '#fd8d3c', '#feb24c', '#fed976', '#ffeda0'];
+
+            reportChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Number of Sites', data: data, backgroundColor: bgColors }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#444' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        document.getElementById('reportModal').style.display = 'flex';
+    }
+
+    function exportCSV() {
+        let visibleFeatures = [];
+        currentInfillLayer.eachLayer(layer => { if (layer.feature) visibleFeatures.push(layer.feature); });
+        
+        let csvRows = [];
+        csvRows.push(["Address", "Neighbourhood", "District", "Permit Date", "Typology", "Scope", "Units", "Density (u/ha)", "Secondary Suite", "Backyard Suite", "LRT Proximity (m)"]);
+        
+        visibleFeatures.forEach(f => {
+            let p = f.properties;
+            let lat = f.geometry.coordinates[1], lng = f.geometry.coordinates[0];
+            let distToLRT = "N/A";
+
+            if (lrtLayer) {
+                let minDist = Infinity;
+                lrtLayer.eachLayer(stn => {
+                    let c = stn.getLatLng();
+                    let d = getDistance(lat, lng, c.lat, c.lng);
+                    if (d < minDist) minDist = d;
+                });
+                distToLRT = Math.round(minDist);
+            }
+
+            let row = [
+                `"${p.Address || p.ADDRESS || ''}"`,
+                `"${p.NBHD || p.nbhd || ''}"`,
+                `"${p.District || p.district || ''}"`,
+                `"${p["Permit Date"] || p.Permit_Date || ''}"`,
+                `"${getBaseTypology(p)}"`,
+                isConversion(p) ? "Conversion/Addition" : "New Build",
+                p.Units || p.units || 1,
+                getDensityVal(p),
+                hasSecondary(p) ? "Yes" : "No",
+                hasBackyard(p) ? "Yes" : "No",
+                distToLRT
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        let csvString = csvRows.join('\n');
+        let blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        let url = URL.createObjectURL(blob);
+        let link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Residential_Redevelopment_Data_Export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
     </script>
 
+    
 </body>
 </html>
