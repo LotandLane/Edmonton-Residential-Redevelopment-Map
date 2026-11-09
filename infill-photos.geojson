@@ -174,6 +174,9 @@
 {"type":"Feature","properties":{"Field1":"Inf-002498","Field2":"images\\Inf-002498-001.jpg","Field3":"Rendering/Sign","Field4":null},"geometry":null},
 {"type":"Feature","properties":{"Field1":"Inf-002503","Field2":"images\\Inf-002503-001.jpg","Field3":"Construction progress","Field4":null},"geometry":null},
 {"type":"Feature","properties":{"Field1":"Inf-002337","Field2":"images\\Inf-002337-001.jpg","Field3":"Construction progress","Field4":null},"geometry":null},
-{"type":"Feature","properties":{"Field1":"Inf-002325","Field2":"images\\Inf-002325-001.jpg","Field3":"Construction progress","Field4":null},"geometry":null}
+{"type":"Feature","properties":{"Field1":"Inf-002325","Field2":"images\\Inf-002325-001.jpg","Field3":"Construction progress","Field4":null},"geometry":null},
+{"type":"Feature","properties":{"Field1":"Inf-001096","Field2":"images\\Inf-001096-001.jpg","Field3":"Rendering/Sign","Field4":null},"geometry":null},
+{"type":"Feature","properties":{"Field1":"Inf-001912","Field2":"images\\Inf-001912-001.jpg","Field3":"Construction progress","Field4":null},"geometry":null},
+{"type":"Feature","properties":{"Field1":"Inf-000361","Field2":"images\\Inf-000361-001.jpg","Field3":"Construction progress","Field4":null},"geometry":null}
 ]
 }
